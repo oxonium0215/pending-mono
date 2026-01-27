@@ -156,6 +156,12 @@ jobs:
           pip install -r requirements.txt
           npm install
 
+      - name: Sync build.ini Version
+        run: |
+          VERSION=$(jq -r .project_version versions.json)
+          sed -i "s/^VERSION =.*/VERSION = $VERSION/" build.ini
+          echo "Synced build.ini to version $VERSION"
+
       - name: Prepare Source Fonts Directory
         run: |
           rm -rf source_fonts/commit-mono source_fonts/biz-udgothic source_fonts/nerd-fonts source_fonts/fontlab

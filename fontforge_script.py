@@ -514,6 +514,18 @@ def edit_meta_data(font, weight: str, variant: str):
     font.ascent = EM_ASCENT
     font.descent = EM_DESCENT
 
+    # Version settings
+    font.version = VERSION
+    try:
+        # 1.0.1 -> 1.01
+        v_parts = VERSION.split('.')
+        if len(v_parts) >= 2:
+            font.fontRevision = float(f"{v_parts[0]}.{''.join(v_parts[1:])}")
+        else:
+            font.fontRevision = float(VERSION)
+    except Exception:
+        pass
+
     font.os2_typoascent = OS2_ASCENT
     font.os2_typodescent = -OS2_DESCENT
     font.os2_typolinegap = 0

@@ -55,6 +55,7 @@ jobs:
           path: |
             versions_new.json
             release_notes.md
+            build.ini
 
   build:
     needs: check
@@ -145,7 +146,7 @@ jobs:
           mv versions_new.json versions.json
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add versions.json
+          git add versions.json build.ini
           git commit -m "Bump version to ${{ needs.check.outputs.new_version }}"
           git push
 
