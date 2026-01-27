@@ -253,6 +253,11 @@ def fix_post_table(xml: ET):
     # タグ形式: <isFixedPitch value="0"/>
     is_fixed_pitch = 0
     xml.find("post/isFixedPitch").set("value", str(is_fixed_pitch))
+    
+    # underlinePositionを編集
+    # Commit Mono original is -100
+    underline_position = -100
+    xml.find("post/underlinePosition").set("value", str(underline_position))
 
 
 def fix_cmap_table(xml: ET, style: str, variant: str):

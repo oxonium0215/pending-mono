@@ -1,0 +1,226 @@
+name: Custom Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      # --- Build Options ---
+      use_nerd_font:
+        description: 'Include Nerd Fonts?'
+        type: boolean
+        default: true
+      use_jp_symbols:
+        description: 'Use Japanese Symbols? (jpdoc)'
+        type: boolean
+        default: false
+      half_width:
+        description: 'Half Width (1:2 ratio)?'
+        type: boolean
+        default: false
+      visualize_zenkaku_space:
+        description: 'Visualize Full-width Space?'
+        type: boolean
+        default: true
+
+      # --- Weights ---
+      regular_weight:
+        description: 'Regular Weight'
+        type: choice
+        options: [200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700]
+        default: '400'
+      bold_weight:
+        description: 'Bold Weight'
+        type: choice
+        options: [200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700]
+        default: '700'
+
+      # --- Commit Mono Features ---
+      enable_ligatures:
+        description: 'Enable Ligatures (ss01, ss02)'
+        type: boolean
+        default: false
+      enable_smart_features:
+        description: 'Enable Smart Features (ss03, ss04, ss05)'
+        type: boolean
+        default: true
+      
+      # --- Commit Mono Alternates ---
+      cv01:
+        description: "Alt. 'a' (Single storey)"
+        type: boolean
+        default: false
+      cv02:
+        description: "Alt. 'g' (Single storey)"
+        type: boolean
+        default: false
+      cv03:
+        description: "Square dots .:ij"
+        type: boolean
+        default: false
+      cv04:
+        description: "Alt. 'i' (Sans serif)"
+        type: boolean
+        default: false
+      cv05:
+        description: "Standard @"
+        type: boolean
+        default: false
+      cv06:
+        description: "Alt. '6', '9' (Open)"
+        type: boolean
+        default: false
+      cv07:
+        description: "Dotted 0"
+        type: boolean
+        default: false
+      cv08:
+        description: "Alt. italic 'aefgy'"
+        type: boolean
+        default: false
+      cv09:
+        description: "Lifted *"
+        type: boolean
+        default: false
+      cv10:
+        description: "Alt. l (serif bottom)"
+        type: boolean
+        default: false
+      cv11:
+        description: "Alt. 1 (rounded top)"
+        type: boolean
+        default: false
+
+      # --- Spacing ---
+      letter_spacing:
+        description: 'Letter Spacing'
+        required: false
+        default: '0'
+      line_height:
+        description: 'Line Height'
+        required: false
+        default: '1.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Assemble Options
+        id: assemble_options
+        run: |
+          # --- Assemble Commit Mono Features ---
+          FEATURES=""
+          if [ "${{ github.event.inputs.enable_ligatures }}" == "true" ]; then FEATURES+=,ss01,ss02; fi
+          if [ "${{ github.event.inputs.enable_smart_features }}" == "true" ]; then FEATURES+=,ss03,ss04,ss05; fi
+          if [ "${{ github.event.inputs.cv01 }}" == "true" ]; then FEATURES+=,cv01; fi
+          if [ "${{ github.event.inputs.cv02 }}" == "true" ]; then FEATURES+=,cv02; fi
+          if [ "${{ github.event.inputs.cv03 }}" == "true" ]; then FEATURES+=,cv03; fi
+          if [ "${{ github.event.inputs.cv04 }}" == "true" ]; then FEATURES+=,cv04; fi
+          if [ "${{ github.event.inputs.cv05 }}" == "true" ]; then FEATURES+=,cv05; fi
+          if [ "${{ github.event.inputs.cv06 }}" == "true" ]; then FEATURES+=,cv06; fi
+          if [ "${{ github.event.inputs.cv07 }}" == "true" ]; then FEATURES+=,cv07; fi
+          if [ "${{ github.event.inputs.cv08 }}" == "true" ]; then FEATURES+=,cv08; fi
+          if [ "${{ github.event.inputs.cv09 }}" == "true" ]; then FEATURES+=,cv09; fi
+          if [ "${{ github.event.inputs.cv10 }}" == "true" ]; then FEATURES+=,cv10; fi
+          if [ "${{ github.event.inputs.cv11 }}" == "true" ]; then FEATURES+=,cv11; fi
+          # Remove leading comma
+          FEATURES=$(echo $FEATURES | sed 's/^,//')
+          echo "COMMIT_MONO_FEATURES=${FEATURES}" >> $GITHUB_OUTPUT
+          
+          # --- Assemble Pending Mono Options ---
+          PM_OPTIONS=""
+          if [ "${{ github.event.inputs.use_nerd_font }}" == "true" ]; then PM_OPTIONS+=" --nerd-font"; fi
+          if [ "${{ github.event.inputs.use_jp_symbols }}" == "true" ]; then PM_OPTIONS+=" --jpdoc"; fi
+          if [ "${{ github.event.inputs.half_width }}" == "true" ]; then PM_OPTIONS+=" --half-width"; fi
+          if [ "${{ github.event.inputs.visualize_zenkaku_space }}" == "false" ]; then PM_OPTIONS+=" --invisible-zenkaku-space"; fi
+          echo "PENDING_MONO_OPTIONS=${PM_OPTIONS}" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '18'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fontforge python3-fontforge ttfautohint jq zip
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install Project Dependencies
+        run: |
+          pip install -r requirements.txt
+          npm install
+
+      - name: Prepare Source Fonts Directory
+        run: |
+          mkdir -p source_fonts/commit-mono
+          mkdir -p source_fonts/biz-udgothic
+          mkdir -p source_fonts/nerd-fonts
+          mkdir -p source_fonts/fontlab
+
+      - name: Download Commit Mono Source
+        run: |
+          # Get latest version tag from GitHub API
+          TAG=$(curl -s "https://api.github.com/repos/eigilnikolajsen/commit-mono/releases/latest" | grep -oP '"tag_name": "\K[^" ]+' | head -n 1)
+          echo "Downloading Commit Mono Source (zip): $TAG"
+          wget -O CommitMonoSource.zip "https://github.com/eigilnikolajsen/commit-mono/archive/refs/tags/${TAG}.zip"
+          unzip CommitMonoSource.zip -d commit-mono-temp
+          
+          FONTLAB_DIR=$(find commit-mono-temp -type d -name "fontlab" | head -n 1)
+          if [ -z "$FONTLAB_DIR" ]; then
+            echo "Error: fontlab directory not found"
+            exit 1
+          fi
+          cp -r "$FONTLAB_DIR"/* source_fonts/fontlab/
+          ls -l source_fonts/fontlab/
+
+      - name: Download BIZ UD Gothic
+        run: |
+          VERSION=$(curl -s "https://api.github.com/repos/googlefonts/morisawa-biz-ud-gothic/releases/latest" | grep -oP '"tag_name": "\K[^" ]+' | head -n 1)
+          echo "Downloading BIZ UD Gothic version: $VERSION"
+          wget -O BIZUDGothic.zip "https://github.com/googlefonts/morisawa-biz-ud-gothic/releases/download/${VERSION}/BIZUDGothic.zip"
+          unzip BIZUDGothic.zip -d biz-udgothic-temp
+          find biz-udgothic-temp -name "BIZUDGothic-Regular.ttf" -exec cp {} source_fonts/biz-udgothic/ \;
+          find biz-udgothic-temp -name "BIZUDGothic-Bold.ttf" -exec cp {} source_fonts/biz-udgothic/ \;
+
+      - name: Download Nerd Fonts
+        run: |
+          VERSION=$(curl -s "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | grep -oP '"tag_name": "\K[^" ]+' | head -n 1)
+          echo "Downloading Nerd Fonts version: $VERSION"
+          wget -O NerdFontsSymbolsOnly.zip "https://github.com/ryanoasis/nerd-fonts/releases/download/${VERSION}/NerdFontsSymbolsOnly.zip"
+          unzip NerdFontsSymbolsOnly.zip -d nerd-fonts-temp
+          cp nerd-fonts-temp/SymbolsNerdFont-Regular.ttf source_fonts/nerd-fonts/
+
+      - name: Customize Commit Mono
+        run: |
+          node customize_commit_mono.js \
+            --features "${{ steps.assemble_options.outputs.COMMIT_MONO_FEATURES }}" \
+            --letter-spacing "${{ github.event.inputs.letter_spacing }}" \
+            --line-height "${{ github.event.inputs.line_height }}" \
+            --regular-weight "${{ github.event.inputs.regular_weight }}" \
+            --bold-weight "${{ github.event.inputs.bold_weight }}"
+
+      - name: Build Pending Mono (FontForge)
+        run: |
+          /usr/bin/python3 fontforge_script.py \
+            ${{ steps.assemble_options.outputs.PENDING_MONO_OPTIONS }} \
+            --regular-weight "${{ github.event.inputs.regular_weight }}" \
+            --bold-weight "${{ github.event.inputs.bold_weight }}"
+
+      - name: Build Pending Mono (FontTools)
+        run: python3 fonttools_script.py
+
+      - name: Zip Artifacts
+        run: |
+          zip -j Custom-StagedMono.zip build/*.ttf
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: Custom-StagedMono
+          path: Custom-StagedMono.zip

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staged Mono Weight Comparison</title>
+    <style>
+        @font-face {
+            font-family: 'StagedMono';
+            src: url('./dist/StagedMonoNF-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'StagedMono';
+            src: url('./dist/StagedMonoNF-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'StagedMono';
+            src: url('./dist/StagedMonoNF-Italic.ttf') format('truetype');
+            font-weight: 400;
+            font-style: italic;
+        }
+        @font-face {
+            font-family: 'StagedMono';
+            src: url('./dist/StagedMonoNF-BoldItalic.ttf') format('truetype');
+            font-weight: 700;
+            font-style: italic;
+        }
+
+        body {
+            font-family: 'StagedMono', monospace;
+            padding: 40px;
+            background-color: #fff;
+            color: #000;
+        }
+
+        h1 { font-family: sans-serif; border-bottom: 1px solid #ccc; }
+
+        .weight-section {
+            margin-bottom: 40px;
+        }
+
+        .sample-text {
+            font-size: 18px;
+            line-height: 1.4;
+            white-space: pre;
+        }
+
+        .label {
+            font-family: sans-serif;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .bold { font-weight: 700; }
+        .regular { font-weight: 400; }
+        .italic { font-style: italic; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Staged Mono Weight Comparison</h1>
+
+    <div class="weight-section">
+        <span class="label">Regular (400) vs Bold (700)</span>
+        <div class="comparison-grid">
+            <div class="regular">
+                <div class="sample-text">Staged Mono Regular 400
+The quick brown fox jumps over the lazy dog.
+0123456789 !@#$%^&*()
+日本語の表示テスト (Regular)
+プログラミングフォントの美しさ。</div>
+            </div>
+            <div class="bold">
+                <div class="sample-text">Staged Mono Bold 700
+The quick brown fox jumps over the lazy dog.
+0123456789 !@#$%^&*()
+日本語の表示テスト (Bold)
+プログラミングフォントの美しさ。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="weight-section">
+        <span class="label">Italic (400) vs Bold Italic (700)</span>
+        <div class="comparison-grid">
+            <div class="regular italic">
+                <div class="sample-text">Staged Mono Italic 400
+The quick brown fox jumps over the lazy dog.
+0123456789 !@#$%^&*()
+日本語の表示テスト (Italic)
+プログラミングフォントの美しさ。</div>
+            </div>
+            <div class="bold italic">
+                <div class="sample-text">Staged Mono Bold Italic 700
+The quick brown fox jumps over the lazy dog.
+0123456789 !@#$%^&*()
+日本語の表示テスト (Bold Italic)
+プログラミングフォントの美しさ。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="weight-section">
+        <span class="label">Mixed Weights Paragraph</span>
+        <div class="sample-text">
+This is a paragraph showing <span class="regular">Regular</span> and <span class="bold">Bold</span> text side by side.
+You can also see <span class="regular italic">Italic</span> and <span class="bold italic">Bold Italic</span> variations.
+等幅フォントにおける <b>太字</b> と <i>斜体</i> のバランスを確認してください。
+特に日本語の <b>「太字」</b> が自然に見えるかどうかが重要です。
+        </div>
+    </div>
+
+</body>
+</html>

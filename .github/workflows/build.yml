@@ -1,0 +1,169 @@
+name: Build Fonts
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly run
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if no updates'
+        required: false
+        default: true
+        type: boolean
+      force_release:
+        description: 'Force create a new release version'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check_version.outputs.should_build }}
+      new_version: ${{ steps.check_version.outputs.new_version }}
+      commit_mono_version: ${{ steps.check_version.outputs.commit_mono_version }}
+      biz_ud_version: ${{ steps.check_version.outputs.biz_ud_version }}
+      nerd_font_version: ${{ steps.check_version.outputs.nerd_font_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check for updates
+        id: check_version
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.force_release }}" == "true" ]; then ARGS="--force"; fi
+          python check_update.py $ARGS
+      
+      - name: Upload Version State
+        if: steps.check_version.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v6
+        with:
+          name: build_state
+          path: |
+            versions_new.json
+            release_notes.md
+
+  build:
+    needs: check
+    if: needs.check.outputs.should_build == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Version State
+        uses: actions/download-artifact@v6
+        with:
+          name: build_state
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '18'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fontforge python3-fontforge ttfautohint zip
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install Project Dependencies
+        run: |
+          pip install -r requirements.txt
+          npm install
+
+      - name: Prepare Source Fonts Directory
+        run: |
+          mkdir -p source_fonts/commit-mono
+          mkdir -p source_fonts/biz-udgothic
+          mkdir -p source_fonts/nerd-fonts
+          mkdir -p source_fonts/fontlab
+
+      - name: Download Commit Mono Source
+        run: |
+          TAG="${{ needs.check.outputs.commit_mono_version }}"
+          echo "Downloading Commit Mono Source (zip): $TAG"
+          # GitHub's source code zip URL: https://github.com/<user>/<repo>/archive/refs/tags/<tag>.zip
+          wget -O CommitMonoSource.zip "https://github.com/eigilnikolajsen/commit-mono/archive/refs/tags/${TAG}.zip"
+          unzip CommitMonoSource.zip -d commit-mono-temp
+          
+          # Find and copy fontlab directory contents
+          FONTLAB_DIR=$(find commit-mono-temp -type d -name "fontlab" | head -n 1)
+          if [ -z "$FONTLAB_DIR" ]; then
+            echo "Error: fontlab directory not found in zip"
+            exit 1
+          fi
+          echo "Found fontlab dir: $FONTLAB_DIR"
+          cp -r "$FONTLAB_DIR"/* source_fonts/fontlab/
+          
+          # Verify files
+          ls -l source_fonts/fontlab/
+
+      - name: Download BIZ UD Gothic
+        run: |
+          TAG="${{ needs.check.outputs.biz_ud_version }}"
+          echo "Downloading BIZ UD Gothic version: $TAG"
+          wget -O BIZUDGothic.zip "https://github.com/googlefonts/morisawa-biz-ud-gothic/releases/download/${TAG}/BIZUDGothic.zip"
+          unzip BIZUDGothic.zip -d biz-udgothic-temp
+          find biz-udgothic-temp -name "BIZUDGothic-Regular.ttf" -exec cp {} source_fonts/biz-udgothic/ \;
+          find biz-udgothic-temp -name "BIZUDGothic-Bold.ttf" -exec cp {} source_fonts/biz-udgothic/ \;
+
+      - name: Download Nerd Fonts
+        run: |
+          VERSION="${{ needs.check.outputs.nerd_font_version }}"
+          echo "Downloading Nerd Fonts version: $VERSION"
+          wget -O NerdFontsSymbolsOnly.zip "https://github.com/ryanoasis/nerd-fonts/releases/download/${VERSION}/NerdFontsSymbolsOnly.zip"
+          unzip NerdFontsSymbolsOnly.zip -d nerd-fonts-temp
+          cp nerd-fonts-temp/SymbolsNerdFont-Regular.ttf source_fonts/nerd-fonts/
+
+      - name: Build All Variants
+        run: |
+          chmod +x build_variants.sh
+          ./build_variants.sh
+
+      - name: Commit Updated Version State
+        if: needs.check.outputs.should_build == 'true'
+        run: |
+          mv versions_new.json versions.json
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add versions.json
+          git commit -m "Bump version to ${{ needs.check.outputs.new_version }}"
+          git push
+
+      - name: Create Release
+        if: needs.check.outputs.should_build == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check.outputs.new_version }}
+          name: Release v${{ needs.check.outputs.new_version }}
+          body_path: release_notes.md
+          files: dist/*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts (Manual Run)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v6
+        with:
+          name: StagedMono-All-Variants
+          path: dist/*.zip

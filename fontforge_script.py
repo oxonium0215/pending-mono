@@ -24,6 +24,7 @@ VENDER_NAME = settings.get("DEFAULT", "VENDER_NAME")
 FONTFORGE_PREFIX = settings.get("DEFAULT", "FONTFORGE_PREFIX")
 IDEOGRAPHIC_SPACE = settings.get("DEFAULT", "IDEOGRAPHIC_SPACE")
 HALF_WIDTH_STR = settings.get("DEFAULT", "HALF_WIDTH_STR")
+FULL_WIDTH_35_STR = settings.get("DEFAULT", "FULL_WIDTH_35_STR")
 INVISIBLE_ZENKAKU_SPACE_STR = settings.get("DEFAULT", "INVISIBLE_ZENKAKU_SPACE_STR")
 JPDOC_STR = settings.get("DEFAULT", "JPDOC_STR")
 NERD_FONTS_STR = settings.get("DEFAULT", "NERD_FONTS_STR")
@@ -47,6 +48,8 @@ Copyright 2022 Yuko Otawara
 
 options = {}
 nerd_font = None
+REG_WEIGHT = 400
+BOLD_WEIGHT = 700
 
 
 def main():
@@ -63,22 +66,26 @@ def main():
     if not os.path.exists(BUILD_FONTS_DIR):
         os.mkdir(BUILD_FONTS_DIR)
 
-    generate_font("Regular", "400-Regular", "Regular")
-    generate_font("Bold", "700-Regular", "Bold")
-    generate_font("Regular", "400-Italic", "Italic", italic=True)
-    generate_font("Bold", "700-Italic", "BoldItalic", italic=True)
+    generate_font("Regular", f"{REG_WEIGHT}-Regular", "Regular")
+    generate_font("Bold", f"{BOLD_WEIGHT}-Regular", "Bold")
+    generate_font("Regular", f"{REG_WEIGHT}-Italic", "Italic", italic=True)
+    generate_font("Bold", f"{BOLD_WEIGHT}-Italic", "BoldItalic", italic=True)
 
 
 def get_options():
     """オプションを取得する"""
 
-    global options
+    global options, REG_WEIGHT, BOLD_WEIGHT
 
     # オプションなしの場合は何もしない
     if len(sys.argv) == 1:
         return
 
-    for arg in sys.argv[1:]:
+    skip_next = False
+    for i, arg in enumerate(sys.argv[1:]):
+        if skip_next:
+            skip_next = False
+            continue
         # オプション判定
         if arg == "--do-not-delete-build-dir":
             options["do-not-delete-build-dir"] = True
@@ -90,6 +97,16 @@ def get_options():
             options["jpdoc"] = True
         elif arg == "--nerd-font":
             options["nerd-font"] = True
+        elif arg == "--regular-weight":
+            val = sys.argv[i + 2]
+            if val and val.isdigit():
+                REG_WEIGHT = int(val)
+            skip_next = True
+        elif arg == "--bold-weight":
+            val = sys.argv[i + 2]
+            if val and val.isdigit():
+                BOLD_WEIGHT = int(val)
+            skip_next = True
         else:
             options["unknown-option"] = True
             return
@@ -98,7 +115,7 @@ def get_options():
 def usage():
     print(
         f"Usage: {sys.argv[0]} "
-        "[--invisible-zenkaku-space] [--half-width] [--jpdoc] [--nerd-font]"
+        "[--invisible-zenkaku-space] [--half-width] [--jpdoc] [--nerd-font] [--regular-weight N] [--bold-weight N]"
     )
 
 
@@ -146,7 +163,7 @@ def generate_font(jp_style, eng_style, merged_style, italic=False):
         add_nerd_font_glyphs(jp_font, eng_font)
 
     # オプション毎の修飾子を追加する
-    variant = HALF_WIDTH_STR if options.get("half-width") else ""
+    variant = HALF_WIDTH_STR if options.get("half-width") else FULL_WIDTH_35_STR
     variant += (
         INVISIBLE_ZENKAKU_SPACE_STR if options.get("invisible-zenkaku-space") else ""
     )
@@ -528,6 +545,16 @@ at: http://scripts.sil.org/OFL""",
     font.fullname = f"{FONT_NAME} {variant}".strip() + f" {weight}"
     font.os2_vendor = VENDER_NAME
     font.copyright = COPYRIGHT
+
+    # HackGen settings
+    font.os2_width = 5  # Medium
+    font.os2_fstype = 0  # Installable Embedding
+    font.os2_family_class = 2057  # SS Typewriter Gothic
+    
+    if "Bold" in weight:
+        font.os2_weight = BOLD_WEIGHT
+    else:
+        font.os2_weight = REG_WEIGHT
 
 
 if __name__ == "__main__":

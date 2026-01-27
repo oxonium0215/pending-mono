@@ -1,2 +1,4 @@
 fonttools==4.40.0
 ttfautohint-py==0.5.1
+requests
+

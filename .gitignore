@@ -1,3 +1,21 @@
 build/
 release_files/
 work_scripts/
+
+# Added for automated build system
+source_fonts/*
+!source_fonts/ideographic_space.sfd
+comparison_fonts/
+dist/
+nerd-fonts-temp/
+biz-udgothic-temp/
+commit-mono-repo/
+biz-udgothic-repo/
+commit-mono-temp/
+node_modules/
+*.zip
+versions_new.json
+release_notes.md
+
+# Test and temporary scripts
+test_display.html
