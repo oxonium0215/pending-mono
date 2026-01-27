@@ -34,12 +34,24 @@ on:
         default: '700'
 
       # --- Commit Mono Features ---
-      enable_ligatures:
-        description: 'Enable Ligatures (ss01, ss02)'
+      ss01:
+        description: 'ss01: Less/Greater Equal Ligatures'
         type: boolean
         default: false
-      enable_smart_features:
-        description: 'Enable Smart Features (ss03, ss04, ss05)'
+      ss02:
+        description: 'ss02: Arrow Ligatures'
+        type: boolean
+        default: false
+      ss03:
+        description: 'ss03: Contextual Case'
+        type: boolean
+        default: true
+      ss04:
+        description: 'ss04: Contextual Ellipsis'
+        type: boolean
+        default: true
+      ss05:
+        description: 'ss05: Smart Kerning'
         type: boolean
         default: true
       
@@ -97,7 +109,7 @@ on:
       line_height:
         description: 'Line Height'
         required: false
-        default: '1.0'
+        default: '1.2'
 
 jobs:
   build:
@@ -111,8 +123,11 @@ jobs:
         run: |
           # --- Assemble Commit Mono Features ---
           FEATURES=""
-          if [ "${{ github.event.inputs.enable_ligatures }}" == "true" ]; then FEATURES+=,ss01,ss02; fi
-          if [ "${{ github.event.inputs.enable_smart_features }}" == "true" ]; then FEATURES+=,ss03,ss04,ss05; fi
+          if [ "${{ github.event.inputs.ss01 }}" == "true" ]; then FEATURES+=,ss01; fi
+          if [ "${{ github.event.inputs.ss02 }}" == "true" ]; then FEATURES+=,ss02; fi
+          if [ "${{ github.event.inputs.ss03 }}" == "true" ]; then FEATURES+=,ss03; fi
+          if [ "${{ github.event.inputs.ss04 }}" == "true" ]; then FEATURES+=,ss04; fi
+          if [ "${{ github.event.inputs.ss05 }}" == "true" ]; then FEATURES+=,ss05; fi
           if [ "${{ github.event.inputs.cv01 }}" == "true" ]; then FEATURES+=,cv01; fi
           if [ "${{ github.event.inputs.cv02 }}" == "true" ]; then FEATURES+=,cv02; fi
           if [ "${{ github.event.inputs.cv03 }}" == "true" ]; then FEATURES+=,cv03; fi
@@ -134,6 +149,8 @@ jobs:
           if [ "${{ github.event.inputs.use_jp_symbols }}" == "true" ]; then PM_OPTIONS+=" --jpdoc"; fi
           if [ "${{ github.event.inputs.half_width }}" == "true" ]; then PM_OPTIONS+=" --half-width"; fi
           if [ "${{ github.event.inputs.visualize_zenkaku_space }}" == "false" ]; then PM_OPTIONS+=" --invisible-zenkaku-space"; fi
+          # Add line-height option
+          PM_OPTIONS+=" --line-height ${{ github.event.inputs.line_height }}"
           echo "PENDING_MONO_OPTIONS=${PM_OPTIONS}" >> $GITHUB_OUTPUT
 
       - name: Setup Node.js

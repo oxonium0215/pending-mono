@@ -75,7 +75,7 @@ def main():
 def get_options():
     """オプションを取得する"""
 
-    global options, REG_WEIGHT, BOLD_WEIGHT
+    global options, REG_WEIGHT, BOLD_WEIGHT, OS2_ASCENT, OS2_DESCENT
 
     # オプションなしの場合は何もしない
     if len(sys.argv) == 1:
@@ -107,6 +107,17 @@ def get_options():
             if val and val.isdigit():
                 BOLD_WEIGHT = int(val)
             skip_next = True
+        elif arg == "--line-height":
+            val = sys.argv[i + 2]
+            try:
+                lh = float(val)
+                total = round(1000 * lh)
+                # 950:250 の比率を維持して計算
+                OS2_ASCENT = round(total * 950 / 1200)
+                OS2_DESCENT = total - OS2_ASCENT
+            except ValueError:
+                pass
+            skip_next = True
         else:
             options["unknown-option"] = True
             return
@@ -115,7 +126,7 @@ def get_options():
 def usage():
     print(
         f"Usage: {sys.argv[0]} "
-        "[--invisible-zenkaku-space] [--half-width] [--jpdoc] [--nerd-font] [--regular-weight N] [--bold-weight N]"
+        "[--invisible-zenkaku-space] [--half-width] [--jpdoc] [--nerd-font] [--regular-weight N] [--bold-weight N] [--line-height N]"
     )
 
 
