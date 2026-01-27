@@ -34,6 +34,7 @@ EM_DESCENT = int(settings.get("DEFAULT", "EM_DESCENT"))
 OS2_ASCENT = int(settings.get("DEFAULT", "OS2_ASCENT"))
 OS2_DESCENT = int(settings.get("DEFAULT", "OS2_DESCENT"))
 HALF_WIDTH_12 = int(settings.get("DEFAULT", "HALF_WIDTH_12"))
+HALF_WIDTH_35 = int(settings.get("DEFAULT", "HALF_WIDTH_35"))
 FULL_WIDTH_35 = int(settings.get("DEFAULT", "FULL_WIDTH_35"))
 
 COPYRIGHT = """[Commit Mono]
@@ -395,8 +396,8 @@ def remove_jpdoc_symbols(eng_font):
 
 def width_600_or_1000(jp_font):
     """半角幅か全角幅になるように変換する。"""
-    half_width = 600
-    full_width = 1000
+    half_width = HALF_WIDTH_35
+    full_width = FULL_WIDTH_35
     for glyph in jp_font.glyphs():
         if 0 < glyph.width <= half_width + 20:
             # グリフ位置を調整してから幅を設定
@@ -418,7 +419,7 @@ def transform_half_width(jp_font, eng_font):
     for glyph in eng_font.glyphs():
         if glyph.width > 0:
             # リガチャ考慮
-            after_width_eng_multiply = after_width_eng * round(glyph.width / 600)
+            after_width_eng_multiply = after_width_eng * round(glyph.width / HALF_WIDTH_35)
             # 縮小
             glyph.transform(psMat.scale(x_scale, 1))
             # 幅を設定
@@ -428,11 +429,11 @@ def transform_half_width(jp_font, eng_font):
             glyph.width = after_width_eng_multiply
 
     for glyph in jp_font.glyphs():
-        if glyph.width == 600:
+        if glyph.width == HALF_WIDTH_35:
             # 英数字グリフと同じ幅にする
             glyph.transform(psMat.translate((after_width_eng - glyph.width) / 2, 0))
             glyph.width = after_width_eng
-        elif glyph.width == 1000:
+        elif glyph.width == FULL_WIDTH_35:
             # 全角は after_width_eng の倍の幅にする
             glyph.transform(psMat.translate((after_width_eng * 2 - glyph.width) / 2, 0))
             glyph.width = after_width_eng * 2
@@ -498,7 +499,7 @@ def add_nerd_font_glyphs(jp_font, eng_font):
                 # グリフの高さ・位置を調整する
                 nerd_glyph.transform(psMat.scale(1, 1.21))
                 nerd_glyph.transform(psMat.translate(0, -24))
-            elif nerd_glyph.width < 600:
+            elif nerd_glyph.width < HALF_WIDTH_35:
                 # 幅が狭いグリフは中央寄せとみなして調整する
                 nerd_glyph.transform(
                     psMat.translate((half_width - nerd_glyph.width) / 2, 0)

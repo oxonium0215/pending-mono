@@ -21,6 +21,7 @@ SOURCE_FONTS_DIR = settings.get("DEFAULT", "SOURCE_FONTS_DIR")
 BUILD_FONTS_DIR = settings.get("DEFAULT", "BUILD_FONTS_DIR")
 HALF_WIDTH_STR = settings.get("DEFAULT", "HALF_WIDTH_STR")
 HALF_WIDTH_12 = int(settings.get("DEFAULT", "HALF_WIDTH_12"))
+HALF_WIDTH_35 = int(settings.get("DEFAULT", "HALF_WIDTH_35"))
 FULL_WIDTH_35 = int(settings.get("DEFAULT", "FULL_WIDTH_35"))
 OS2_ASCENT = int(settings.get("DEFAULT", "OS2_ASCENT"))
 OS2_DESCENT = int(settings.get("DEFAULT", "OS2_DESCENT"))
@@ -125,7 +126,7 @@ def fix_font_tables(style, variant):
     # OS/2 テーブルを編集
     fix_os2_table(xml, style, flag_hw=HALF_WIDTH_STR in variant)
     # hhea テーブルを編集
-    fix_hhea_table(xml)
+    fix_hhea_table(xml, style)
     # post テーブルを編集
     fix_post_table(xml)
     # cmap テーブルを編集
@@ -184,7 +185,7 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
     if flag_hw:
         x_avg_char_width = HALF_WIDTH_12
     else:
-        x_avg_char_width = FULL_WIDTH_35
+        x_avg_char_width = HALF_WIDTH_35
     xml.find("OS_2/xAvgCharWidth").set("value", str(x_avg_char_width))
 
     # 垂直メトリクスを強制設定
@@ -247,11 +248,21 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
         xml.find(f"OS_2/panose/{key}").set("value", str(value))
 
 
-def fix_hhea_table(xml: ET):
+def fix_hhea_table(xml: ET, style: str):
     """hhea テーブルを編集する"""
     xml.find("hhea/ascent").set("value", str(OS2_ASCENT))
     xml.find("hhea/descent").set("value", str(-OS2_DESCENT))
     xml.find("hhea/lineGap").set("value", "0")
+
+    # Italic 調整
+    if "Italic" in style:
+        # Rise は EM (1000)
+        # Run は Rise * tan(9 deg) = 1000 * 0.15838 = 158
+        xml.find("hhea/caretSlopeRise").set("value", "1000")
+        xml.find("hhea/caretSlopeRun").set("value", "158")
+    else:
+        xml.find("hhea/caretSlopeRise").set("value", "1")
+        xml.find("hhea/caretSlopeRun").set("value", "0")
 
 
 def fix_post_table(xml: ET):
