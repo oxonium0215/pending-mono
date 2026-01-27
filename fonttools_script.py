@@ -22,6 +22,8 @@ BUILD_FONTS_DIR = settings.get("DEFAULT", "BUILD_FONTS_DIR")
 HALF_WIDTH_STR = settings.get("DEFAULT", "HALF_WIDTH_STR")
 HALF_WIDTH_12 = int(settings.get("DEFAULT", "HALF_WIDTH_12"))
 FULL_WIDTH_35 = int(settings.get("DEFAULT", "FULL_WIDTH_35"))
+OS2_ASCENT = int(settings.get("DEFAULT", "OS2_ASCENT"))
+OS2_DESCENT = int(settings.get("DEFAULT", "OS2_DESCENT"))
 
 
 def main():
@@ -122,6 +124,8 @@ def fix_font_tables(style, variant):
     xml = dump_ttx(input_font_name, output_name_base)
     # OS/2 テーブルを編集
     fix_os2_table(xml, style, flag_hw=HALF_WIDTH_STR in variant)
+    # hhea テーブルを編集
+    fix_hhea_table(xml)
     # post テーブルを編集
     fix_post_table(xml)
     # cmap テーブルを編集
@@ -153,13 +157,15 @@ def fix_font_tables(style, variant):
 
 
 def dump_ttx(input_name_base, output_name_base) -> ET:
-    """OS/2, post テーブルのみのttxファイルを出力"""
+    """OS/2, post, hhea, cmap テーブルのみのttxファイルを出力"""
     ttx.main(
         [
             "-t",
             "OS/2",
             "-t",
             "post",
+            "-t",
+            "hhea",
             "-t",
             "cmap",
             "-f",
@@ -175,12 +181,18 @@ def dump_ttx(input_name_base, output_name_base) -> ET:
 def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
     """OS/2 テーブルを編集する"""
     # xAvgCharWidthを編集
-    # タグ形式: <xAvgCharWidth value="1000"/>
     if flag_hw:
         x_avg_char_width = HALF_WIDTH_12
     else:
         x_avg_char_width = FULL_WIDTH_35
     xml.find("OS_2/xAvgCharWidth").set("value", str(x_avg_char_width))
+
+    # 垂直メトリクスを強制設定
+    xml.find("OS_2/sTypoAscender").set("value", str(OS2_ASCENT))
+    xml.find("OS_2/sTypoDescender").set("value", str(-OS2_DESCENT))
+    xml.find("OS_2/sTypoLineGap").set("value", "0")
+    xml.find("OS_2/usWinAscent").set("value", str(OS2_ASCENT))
+    xml.find("OS_2/usWinDescent").set("value", str(OS2_DESCENT))
 
     # fsSelectionを編集
     # タグ形式: <fsSelection value="00000000 11000000" />
@@ -217,35 +229,29 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
         bWeight = 5
     else:
         bWeight = 8
-    if flag_hw:
-        panose = {
-            "bFamilyType": 2,
-            "bSerifStyle": 11,
-            "bWeight": bWeight,
-            "bProportion": 9,
-            "bContrast": 2,
-            "bStrokeVariation": 2,
-            "bArmStyle": 3,
-            "bLetterForm": 2,
-            "bMidline": 2,
-            "bXHeight": 7,
-        }
-    else:
-        panose = {
-            "bFamilyType": 2,
-            "bSerifStyle": 11,
-            "bWeight": bWeight,
-            "bProportion": 3,
-            "bContrast": 2,
-            "bStrokeVariation": 2,
-            "bArmStyle": 3,
-            "bLetterForm": 2,
-            "bMidline": 2,
-            "bXHeight": 7,
-        }
+    
+    panose = {
+        "bFamilyType": 2,
+        "bSerifStyle": 11,
+        "bWeight": bWeight,
+        "bProportion": 9,
+        "bContrast": 2,
+        "bStrokeVariation": 2,
+        "bArmStyle": 3,
+        "bLetterForm": 2,
+        "bMidline": 2,
+        "bXHeight": 7,
+    }
 
     for key, value in panose.items():
         xml.find(f"OS_2/panose/{key}").set("value", str(value))
+
+
+def fix_hhea_table(xml: ET):
+    """hhea テーブルを編集する"""
+    xml.find("hhea/ascent").set("value", str(OS2_ASCENT))
+    xml.find("hhea/descent").set("value", str(-OS2_DESCENT))
+    xml.find("hhea/lineGap").set("value", "0")
 
 
 def fix_post_table(xml: ET):
