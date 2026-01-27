@@ -69,10 +69,10 @@ async function main() {
     console.log('Weights:', regWeight, boldWeight);
 
     const styles = [
-        { pattern: `${regWeight}Regular.otf`, output: 'CommitMono-Regular.otf', weight: parseInt(regWeight), italic: false, styleName: 'Regular' },
-        { pattern: `${regWeight}Italic.otf`, output: 'CommitMono-Italic.otf', weight: parseInt(regWeight), italic: true, styleName: 'Italic' },
-        { pattern: `${boldWeight}Regular.otf`, output: 'CommitMono-Bold.otf', weight: parseInt(boldWeight), italic: false, styleName: 'Bold' },
-        { pattern: `${boldWeight}Italic.otf`, output: 'CommitMono-BoldItalic.otf', weight: parseInt(boldWeight), italic: true, styleName: 'Bold Italic' }
+        { pattern: `${regWeight}Regular.otf`, output: `CommitMono-${regWeight}-Regular.otf`, weight: parseInt(regWeight), italic: false, styleName: 'Regular' },
+        { pattern: `${regWeight}Italic.otf`, output: `CommitMono-${regWeight}-Italic.otf`, weight: parseInt(regWeight), italic: true, styleName: 'Italic' },
+        { pattern: `${boldWeight}Regular.otf`, output: `CommitMono-${boldWeight}-Regular.otf`, weight: parseInt(boldWeight), italic: false, styleName: 'Bold' },
+        { pattern: `${boldWeight}Italic.otf`, output: `CommitMono-${boldWeight}-Italic.otf`, weight: parseInt(boldWeight), italic: true, styleName: 'Bold Italic' }
     ];
 
     for (const style of styles) {
