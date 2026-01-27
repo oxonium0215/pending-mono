@@ -514,13 +514,8 @@ def edit_meta_data(font, weight: str, variant: str):
     font.ascent = EM_ASCENT
     font.descent = EM_DESCENT
 
-    if NERD_FONTS_STR in variant:
-        # Nerd Fonts の場合は typoascent, typodescent を EM ascent, EM descent よりも大きくする
-        font.os2_typoascent = OS2_ASCENT
-        font.os2_typodescent = -OS2_DESCENT
-    else:
-        font.os2_typoascent = EM_ASCENT
-        font.os2_typodescent = -EM_DESCENT
+    font.os2_typoascent = OS2_ASCENT
+    font.os2_typodescent = -OS2_DESCENT
     font.os2_typolinegap = 0
     font.os2_winascent = OS2_ASCENT
     font.os2_windescent = OS2_DESCENT

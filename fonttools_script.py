@@ -185,15 +185,16 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
     # fsSelectionを編集
     # タグ形式: <fsSelection value="00000000 11000000" />
     # スタイルに応じたビットを立てる
+    # Bit 7 (USE_TYPO_METRICS) を含める
     fs_selection = None
     if style == "Regular":
-        fs_selection = "00000001 01000000"
+        fs_selection = "00000001 11000000"
     elif style == "Italic":
-        fs_selection = "00000001 00000001"
+        fs_selection = "00000001 10000001"
     elif style == "Bold":
-        fs_selection = "00000001 00100000"
+        fs_selection = "00000001 10100000"
     elif style == "BoldItalic":
-        fs_selection = "00000001 00100001"
+        fs_selection = "00000001 10100001"
 
     if fs_selection is not None:
         xml.find("OS_2/fsSelection").set("value", fs_selection)
@@ -250,8 +251,8 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
 def fix_post_table(xml: ET):
     """post テーブルを編集する"""
     # isFixedPitchを編集
-    # タグ形式: <isFixedPitch value="0"/>
-    is_fixed_pitch = 0
+    # タグ形式: <isFixedPitch value="1"/>
+    is_fixed_pitch = 1
     xml.find("post/isFixedPitch").set("value", str(is_fixed_pitch))
     
     # underlinePositionを編集
