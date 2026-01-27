@@ -5,8 +5,13 @@ import sys
 
 def get_latest_tag(repo):
     url = f"https://api.github.com/repos/{repo}/releases/latest"
+    headers = {}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"token {token}"
+    
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         return response.json()["tag_name"]
     except Exception as e:

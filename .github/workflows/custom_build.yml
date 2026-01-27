@@ -189,8 +189,8 @@ jobs:
 
       - name: Download Commit Mono Source
         run: |
-          # Get latest version tag from GitHub API
-          TAG=$(curl -s "https://api.github.com/repos/eigilnikolajsen/commit-mono/releases/latest" | jq -r .tag_name)
+          # Use curl with token to avoid API rate limits
+          TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/eigilnikolajsen/commit-mono/releases/latest" | jq -r .tag_name)
           if [ -z "$TAG" ] || [ "$TAG" == "null" ]; then
             echo "Error: Failed to fetch the latest tag for Commit Mono"
             exit 1
@@ -209,7 +209,7 @@ jobs:
 
       - name: Download BIZ UD Gothic
         run: |
-          VERSION=$(curl -s "https://api.github.com/repos/googlefonts/morisawa-biz-ud-gothic/releases/latest" | jq -r .tag_name)
+          VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/googlefonts/morisawa-biz-ud-gothic/releases/latest" | jq -r .tag_name)
           if [ -z "$VERSION" ] || [ "$VERSION" == "null" ]; then
             echo "Error: Failed to fetch the latest tag for BIZ UD Gothic"
             exit 1
@@ -222,7 +222,7 @@ jobs:
 
       - name: Download Nerd Fonts
         run: |
-          VERSION=$(curl -s "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | jq -r .tag_name)
+          VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | jq -r .tag_name)
           if [ -z "$VERSION" ] || [ "$VERSION" == "null" ]; then
             echo "Error: Failed to fetch the latest tag for Nerd Fonts"
             exit 1
