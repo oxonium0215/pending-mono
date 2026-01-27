@@ -69,22 +69,27 @@ async function main() {
     console.log('Weights:', regWeight, boldWeight);
 
     const styles = [
-        { file: `CommitMonoV143-${regWeight}Regular.otf`, output: 'CommitMono-Regular.otf', weight: parseInt(regWeight), italic: false, styleName: 'Regular' },
-        { file: `CommitMonoV143-${regWeight}Italic.otf`, output: 'CommitMono-Italic.otf', weight: parseInt(regWeight), italic: true, styleName: 'Italic' },
-        { file: `CommitMonoV143-${boldWeight}Regular.otf`, output: 'CommitMono-Bold.otf', weight: parseInt(boldWeight), italic: false, styleName: 'Bold' },
-        { file: `CommitMonoV143-${boldWeight}Italic.otf`, output: 'CommitMono-BoldItalic.otf', weight: parseInt(boldWeight), italic: true, styleName: 'Bold Italic' }
+        { pattern: `${regWeight}Regular.otf`, output: 'CommitMono-Regular.otf', weight: parseInt(regWeight), italic: false, styleName: 'Regular' },
+        { pattern: `${regWeight}Italic.otf`, output: 'CommitMono-Italic.otf', weight: parseInt(regWeight), italic: true, styleName: 'Italic' },
+        { pattern: `${boldWeight}Regular.otf`, output: 'CommitMono-Bold.otf', weight: parseInt(boldWeight), italic: false, styleName: 'Bold' },
+        { pattern: `${boldWeight}Italic.otf`, output: 'CommitMono-BoldItalic.otf', weight: parseInt(boldWeight), italic: true, styleName: 'Bold Italic' }
     ];
 
     for (const style of styles) {
-        const inputPath = path.join(inputDir, style.file);
-        const outputPath = path.join(outputDir, style.output);
-
-        if (!fs.existsSync(inputPath)) {
-            console.error(`File not found: ${inputPath}`);
+        // Find file matching pattern in inputDir
+        const files = fs.readdirSync(inputDir);
+        const matchedFile = files.find(f => f.endsWith(style.pattern));
+        
+        if (!matchedFile) {
+            console.error(`File with pattern ${style.pattern} not found in ${inputDir}`);
+            console.error(`Available files: ${files.join(', ')}`);
             continue;
         }
 
-        console.log(`Processing ${style.file}...`);
+        const inputPath = path.join(inputDir, matchedFile);
+        const outputPath = path.join(outputDir, style.output);
+
+        console.log(`Processing ${matchedFile}...`);
         const buffer = fs.readFileSync(inputPath);
         const font = opentype.parse(buffer.buffer);
 
