@@ -101,6 +101,10 @@ jobs:
       - name: Download Commit Mono Source
         run: |
           TAG="${{ needs.check.outputs.commit_mono_version }}"
+          if [ -z "$TAG" ]; then
+            echo "Error: commit_mono_version is empty"
+            exit 1
+          fi
           echo "Downloading Commit Mono Source (zip): $TAG"
           # GitHub's source code zip URL: https://github.com/<user>/<repo>/archive/refs/tags/<tag>.zip
           wget -O CommitMonoSource.zip "https://github.com/eigilnikolajsen/commit-mono/archive/refs/tags/${TAG}.zip"
@@ -121,6 +125,10 @@ jobs:
       - name: Download BIZ UD Gothic
         run: |
           TAG="${{ needs.check.outputs.biz_ud_version }}"
+          if [ -z "$TAG" ]; then
+            echo "Error: biz_ud_version is empty"
+            exit 1
+          fi
           echo "Downloading BIZ UD Gothic version: $TAG"
           wget -O BIZUDGothic.zip "https://github.com/googlefonts/morisawa-biz-ud-gothic/releases/download/${TAG}/BIZUDGothic.zip"
           unzip BIZUDGothic.zip -d biz-udgothic-temp
@@ -130,6 +138,10 @@ jobs:
       - name: Download Nerd Fonts
         run: |
           VERSION="${{ needs.check.outputs.nerd_font_version }}"
+          if [ -z "$VERSION" ]; then
+            echo "Error: nerd_font_version is empty"
+            exit 1
+          fi
           echo "Downloading Nerd Fonts version: $VERSION"
           wget -O NerdFontsSymbolsOnly.zip "https://github.com/ryanoasis/nerd-fonts/releases/download/${VERSION}/NerdFontsSymbolsOnly.zip"
           unzip NerdFontsSymbolsOnly.zip -d nerd-fonts-temp
