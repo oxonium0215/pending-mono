@@ -91,6 +91,7 @@ jobs:
 
       - name: Prepare Source Fonts Directory
         run: |
+          rm -rf source_fonts/commit-mono source_fonts/biz-udgothic source_fonts/nerd-fonts source_fonts/fontlab
           mkdir -p source_fonts/commit-mono
           mkdir -p source_fonts/biz-udgothic
           mkdir -p source_fonts/nerd-fonts
