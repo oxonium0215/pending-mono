@@ -136,6 +136,16 @@ def main():
     else:
         print("No updates detected.")
         set_output("should_build", "false")
+        set_output("new_version", current_versions["project_version"])
+        set_output("commit_mono_version", current_versions["commit_mono"])
+        set_output("biz_ud_version", current_versions["biz_ud_gothic"])
+        set_output("nerd_font_version", current_versions["nerd_fonts"])
+        
+        # Create these files anyway because the workflow might expect them for artifacts
+        with open("versions_new.json", "w") as f:
+            json.dump(new_versions, f, indent=2)
+        with open("release_notes.md", "w") as f:
+            f.write("Manual build - No changes detected.\n")
 
 if __name__ == "__main__":
     main()
