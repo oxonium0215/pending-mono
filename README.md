@@ -41,7 +41,12 @@ pip install -r requirements.txt
 
 ### Linux
 
-coming soon...
+```sh
+# 実行権限の付与
+chmod +x build_variants.sh
+# ビルド (依存関係のインストール、仮想環境の作成、フォントのビルドをまとめて行います)
+./build_variants.sh
+```
 
 ## ライセンス
 

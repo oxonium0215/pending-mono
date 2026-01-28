@@ -335,7 +335,7 @@ def remove_jpdoc_symbols(eng_font):
     # ■-□ (U+25A0-U+25A1)
     eng_font.selection.select(("more", "ranges"), 0x25A0, 0x25A1)
     # ▲-△ (U+25B2-U+25B3)
-    eng_font.selection.select(("more", "ranges"), 0x25A0, 0x25B3)
+    eng_font.selection.select(("more", "ranges"), 0x25B2, 0x25B3)
     # ▼-▽ (U+25BC-U+25BD)
     eng_font.selection.select(("more", "ranges"), 0x25BC, 0x25BD)
     # ◆-◇ (U+25C6-U+25C7)
@@ -564,6 +564,14 @@ at: http://scripts.sil.org/OFL""",
     font.fullname = f"{FONT_NAME} {variant}".strip() + f" {weight}"
     font.os2_vendor = VENDER_NAME
     font.copyright = COPYRIGHT
+
+    # macstyle settings
+    mac_style = 0
+    if "Bold" in weight:
+        mac_style |= 0x01
+    if "Italic" in weight:
+        mac_style |= 0x02
+    font.macstyle = mac_style
 
     # HackGen settings
     font.os2_width = 5  # Medium

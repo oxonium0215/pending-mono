@@ -30,13 +30,26 @@ OS2_DESCENT = int(settings.get("DEFAULT", "OS2_DESCENT"))
 def main():
     # 第一引数を取得
     # 特定のバリエーションのみを処理するための指定
-    specific_variant = sys.argv[1] if len(sys.argv) > 1 else None
+    specific_variant = None
+    line_height = None
 
-    edit_fonts(specific_variant)
+    for arg in sys.argv[1:]:
+        if arg.startswith("--line-height="):
+            line_height = float(arg.split("=")[1])
+        else:
+            specific_variant = arg
+
+    edit_fonts(specific_variant, line_height)
 
 
-def edit_fonts(specific_variant: str):
+def edit_fonts(specific_variant: str, line_height: float = None):
     """フォントを編集する"""
+
+    global OS2_ASCENT, OS2_DESCENT
+    if line_height is not None:
+        total = round(1000 * line_height)
+        OS2_ASCENT = round(total * 950 / 1200)
+        OS2_DESCENT = total - OS2_ASCENT
 
     if specific_variant is None:
         specific_variant = ""
@@ -121,8 +134,10 @@ def fix_font_tables(style, variant):
     output_name_base = f"{FONTTOOLS_PREFIX}{FONT_NAME}{variant}-{style}"
     completed_name_base = f"{FONT_NAME}{variant}-{style}"
 
-    # OS/2, post テーブルのみのttxファイルを出力
+    # OS/2, post, hhea, cmap, head テーブルのttxファイルを出力
     xml = dump_ttx(input_font_name, output_name_base)
+    # head テーブルを編集
+    fix_head_table(xml, style)
     # OS/2 テーブルを編集
     fix_os2_table(xml, style, flag_hw=HALF_WIDTH_STR in variant)
     # hhea テーブルを編集
@@ -158,7 +173,7 @@ def fix_font_tables(style, variant):
 
 
 def dump_ttx(input_name_base, output_name_base) -> ET:
-    """OS/2, post, hhea, cmap テーブルのみのttxファイルを出力"""
+    """OS/2, post, hhea, cmap, head テーブルのみのttxファイルを出力"""
     ttx.main(
         [
             "-t",
@@ -169,6 +184,8 @@ def dump_ttx(input_name_base, output_name_base) -> ET:
             "hhea",
             "-t",
             "cmap",
+            "-t",
+            "head",
             "-f",
             "-o",
             f"{BUILD_FONTS_DIR}/{output_name_base}.ttx",
@@ -177,6 +194,19 @@ def dump_ttx(input_name_base, output_name_base) -> ET:
     )
 
     return ET.parse(f"{BUILD_FONTS_DIR}/{output_name_base}.ttx")
+
+
+def fix_head_table(xml: ET, style: str):
+    """head テーブルを編集する"""
+    mac_style = 0
+    if "Bold" in style:
+        mac_style |= 0x01
+    if "Italic" in style:
+        mac_style |= 0x02
+    
+    mac_style_bin = format(mac_style, "016b")
+    mac_style_bin = f"{mac_style_bin[:8]} {mac_style_bin[8:]}"
+    xml.find("head/macStyle").set("value", mac_style_bin)
 
 
 def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
@@ -192,8 +222,14 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
     xml.find("OS_2/sTypoAscender").set("value", str(OS2_ASCENT))
     xml.find("OS_2/sTypoDescender").set("value", str(-OS2_DESCENT))
     xml.find("OS_2/sTypoLineGap").set("value", "0")
-    xml.find("OS_2/usWinAscent").set("value", str(OS2_ASCENT))
-    xml.find("OS_2/usWinDescent").set("value", str(OS2_DESCENT))
+
+    # クリッピング対策
+    y_max = int(xml.find("head/yMax").get("value"))
+    y_min = int(xml.find("head/yMin").get("value"))
+    win_ascent = max(y_max, OS2_ASCENT)
+    win_descent = max(abs(y_min), OS2_DESCENT)
+    xml.find("OS_2/usWinAscent").set("value", str(win_ascent))
+    xml.find("OS_2/usWinDescent").set("value", str(win_descent))
 
     # fsSelectionを編集
     # タグ形式: <fsSelection value="00000000 11000000" />
@@ -292,8 +328,15 @@ def fix_cmap_table(xml: ET, style: str, variant: str):
         f"{FONTFORGE_PREFIX}{FONT_NAME}{variant}-{style}-jp",
     )
     source_cmap_format_14 = source_xml.find("cmap/cmap_format_14")
-    target_cmap = xml.find("cmap")
-    target_cmap.append(source_cmap_format_14)
+    if source_cmap_format_14 is not None:
+        target_cmap = xml.find("cmap")
+        # 既存の cmap_format_14 があれば削除
+        existing_format_14 = target_cmap.find("cmap_format_14")
+        if existing_format_14 is not None:
+            target_cmap.remove(existing_format_14)
+        target_cmap.append(source_cmap_format_14)
+    else:
+        print(f"Warning: cmap_format_14 not found in {FONTFORGE_PREFIX}{FONT_NAME}{variant}-{style}-jp.ttf")
 
 
 if __name__ == "__main__":
