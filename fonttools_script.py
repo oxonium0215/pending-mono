@@ -17,14 +17,17 @@ settings.read("build.ini", encoding="utf-8")
 FONT_NAME = settings.get("DEFAULT", "FONT_NAME").replace(" ", "")
 FONTFORGE_PREFIX = settings.get("DEFAULT", "FONTFORGE_PREFIX")
 FONTTOOLS_PREFIX = settings.get("DEFAULT", "FONTTOOLS_PREFIX")
-SOURCE_FONTS_DIR = settings.get("DEFAULT", "SOURCE_FONTS_DIR")
-BUILD_FONTS_DIR = settings.get("DEFAULT", "BUILD_FONTS_DIR")
+SOURCE_FONTS_DIR = os.environ.get("SOURCE_FONTS_DIR") or settings.get("DEFAULT", "SOURCE_FONTS_DIR")
+BUILD_FONTS_DIR = os.environ.get("BUILD_FONTS_DIR") or settings.get("DEFAULT", "BUILD_FONTS_DIR")
 HALF_WIDTH_STR = settings.get("DEFAULT", "HALF_WIDTH_STR")
 HALF_WIDTH_12 = int(settings.get("DEFAULT", "HALF_WIDTH_12"))
 HALF_WIDTH_35 = int(settings.get("DEFAULT", "HALF_WIDTH_35"))
 FULL_WIDTH_35 = int(settings.get("DEFAULT", "FULL_WIDTH_35"))
+EM_ASCENT = int(settings.get("DEFAULT", "EM_ASCENT"))
+EM_DESCENT = int(settings.get("DEFAULT", "EM_DESCENT"))
 OS2_ASCENT = int(settings.get("DEFAULT", "OS2_ASCENT"))
 OS2_DESCENT = int(settings.get("DEFAULT", "OS2_DESCENT"))
+OS2_LINEGAP = int(settings.get("DEFAULT", "OS2_LINEGAP"))
 
 
 def main():
@@ -45,11 +48,14 @@ def main():
 def edit_fonts(specific_variant: str, line_height: float = None):
     """フォントを編集する"""
 
-    global OS2_ASCENT, OS2_DESCENT
+    global OS2_ASCENT, OS2_DESCENT, OS2_LINEGAP
     if line_height is not None:
+        # ベースを 1000 に固定
+        OS2_ASCENT = 880
+        OS2_DESCENT = 120
+        # 超過分を LineGap に逃がす (Notepad 等での行間肥大化対策)
         total = round(1000 * line_height)
-        OS2_ASCENT = round(total * 950 / 1200)
-        OS2_DESCENT = total - OS2_ASCENT
+        OS2_LINEGAP = max(0, total - 1000)
 
     if specific_variant is None:
         specific_variant = ""
@@ -112,6 +118,7 @@ def merge_fonts(style, variant):
     jp_font_path = (
         f"{BUILD_FONTS_DIR}/{FONTFORGE_PREFIX}{FONT_NAME}{variant}-{style}-jp.ttf"
     )
+
     # vhea, vmtxテーブルを削除
     jp_font_object = ttLib.TTFont(jp_font_path)
     if "vhea" in jp_font_object:
@@ -211,6 +218,9 @@ def fix_head_table(xml: ET, style: str):
 
 def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
     """OS/2 テーブルを編集する"""
+    # Version を 4 に固定 (USE_TYPO_METRICS のため)
+    xml.find("OS_2/version").set("value", "4")
+
     # xAvgCharWidthを編集
     if flag_hw:
         x_avg_char_width = HALF_WIDTH_12
@@ -218,50 +228,38 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
         x_avg_char_width = HALF_WIDTH_35
     xml.find("OS_2/xAvgCharWidth").set("value", str(x_avg_char_width))
 
-    # 垂直メトリクスを強制設定
-    xml.find("OS_2/sTypoAscender").set("value", str(OS2_ASCENT))
-    xml.find("OS_2/sTypoDescender").set("value", str(-OS2_DESCENT))
-    xml.find("OS_2/sTypoLineGap").set("value", "0")
+    # Typo メトリクス = EM サイズ (HackGen互換)
+    xml.find("OS_2/sTypoAscender").set("value", str(EM_ASCENT))
+    xml.find("OS_2/sTypoDescender").set("value", str(-EM_DESCENT))
+    xml.find("OS_2/sTypoLineGap").set("value", str(OS2_LINEGAP))
 
-    # クリッピング対策
-    y_max = int(xml.find("head/yMax").get("value"))
-    y_min = int(xml.find("head/yMin").get("value"))
-    win_ascent = max(y_max, OS2_ASCENT)
-    win_descent = max(abs(y_min), OS2_DESCENT)
+    # Windows での行間肥大化対策: usWin 合計を 1200 (1.2倍) に固定
+    # グリフ縮小なしの場合、はみ出し部分はクリップされる可能性があるが行間の一貫性を優先
+    # LineGap を上下に均等に振り分けて WinAscent/Descent を算出する (ハードコード排除)
+    half_linegap = OS2_LINEGAP // 2
+    remainder = OS2_LINEGAP % 2
+    
+    win_ascent = OS2_ASCENT + half_linegap + remainder
+    win_descent = OS2_DESCENT + half_linegap
+
     xml.find("OS_2/usWinAscent").set("value", str(win_ascent))
     xml.find("OS_2/usWinDescent").set("value", str(win_descent))
 
-    # fsSelectionを編集
-    # タグ形式: <fsSelection value="00000000 11000000" />
-    # スタイルに応じたビットを立てる
-    # Bit 7 (USE_TYPO_METRICS) を含める
+    # fsSelection (Bit 7 USE_TYPO_METRICS は無効化: HackGen互換)
     fs_selection = None
     if style == "Regular":
-        fs_selection = "00000001 11000000"
+        fs_selection = "00000000 01000000"
     elif style == "Italic":
-        fs_selection = "00000001 10000001"
+        fs_selection = "00000000 00000001"
     elif style == "Bold":
-        fs_selection = "00000001 10100000"
+        fs_selection = "00000000 00100000"
     elif style == "BoldItalic":
-        fs_selection = "00000001 10100001"
+        fs_selection = "00000000 00100001"
 
     if fs_selection is not None:
         xml.find("OS_2/fsSelection").set("value", fs_selection)
 
-    # panoseを編集
-    # タグ形式:
-    # <panose>
-    #   <bFamilyType value="2" />
-    #   <bSerifStyle value="11" />
-    #   <bWeight value="6" />
-    #   <bProportion value="9" />
-    #   <bContrast value="6" />
-    #   <bStrokeVariation value="3" />
-    #   <bArmStyle value="0" />
-    #   <bLetterForm value="2" />
-    #   <bMidline value="0" />
-    #   <bXHeight value="4" />
-    # </panose>
+    # panose
     if style == "Regular" or style == "Italic":
         bWeight = 5
     else:
@@ -288,7 +286,7 @@ def fix_hhea_table(xml: ET, style: str):
     """hhea テーブルを編集する"""
     xml.find("hhea/ascent").set("value", str(OS2_ASCENT))
     xml.find("hhea/descent").set("value", str(-OS2_DESCENT))
-    xml.find("hhea/lineGap").set("value", "0")
+    xml.find("hhea/lineGap").set("value", "0")  # HackGen互換
 
     # Italic 調整
     if "Italic" in style:
@@ -303,26 +301,13 @@ def fix_hhea_table(xml: ET, style: str):
 
 def fix_post_table(xml: ET):
     """post テーブルを編集する"""
-    # isFixedPitchを編集
-    # タグ形式: <isFixedPitch value="1"/>
-    is_fixed_pitch = 1
-    xml.find("post/isFixedPitch").set("value", str(is_fixed_pitch))
+    xml.find("post/isFixedPitch").set("value", "1")
     
-    # underlinePositionを編集
-    # Commit Mono original is -100
-    underline_position = -100
-    xml.find("post/underlinePosition").set("value", str(underline_position))
+    xml.find("post/underlinePosition").set("value", "-100")
 
 
 def fix_cmap_table(xml: ET, style: str, variant: str):
-    """異体字シーケンスを搭載するために cmap テーブルを編集する。
-    pyftmerge で結合すると異体字シーケンスを司るテーブル cmap_format_14 が
-    消えてしまうため、マージする前の編集済み日本語フォントから該当テーブル情報を取り出して適用する。"""
-    # タグ形式:
-    # <cmap_format_14 platformID="0" platEncID="5">
-    #   <map uv="0x4fae" uvs="0xfe00" name="uniFA30"/>
-    #   <map uv="0x50e7" uvs="0xfe00" name="uniFA31"/>
-    # </cmap_format_14>
+    """異体字シーケンス (cmap_format_14) をマージ後フォントに復元する。"""
     source_xml = dump_ttx(
         f"{FONTFORGE_PREFIX}{FONT_NAME}{variant}-{style}-jp.ttf",
         f"{FONTFORGE_PREFIX}{FONT_NAME}{variant}-{style}-jp",

@@ -50,10 +50,8 @@ async function main() {
         fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // Parse features list
     const activeFeatures = {};
     const activeAlternates = {};
-    // ... (rest of feature parsing)
     const requestedFeatures = featuresList.split(',').map(s => s.trim()).filter(Boolean);
 
     requestedFeatures.forEach(req => {
@@ -79,7 +77,7 @@ async function main() {
         // Find file matching pattern in inputDir
         const files = fs.readdirSync(inputDir);
         const matchedFile = files.find(f => f.endsWith(style.pattern));
-        
+
         if (!matchedFile) {
             console.error(`File with pattern ${style.pattern} not found in ${inputDir}`);
             console.error(`Available files: ${files.join(', ')}`);
@@ -116,7 +114,7 @@ function processFont(font, settings) {
         .reverse()
         .forEach(([alternate, active]) => {
             if (!active) return;
-            
+
             font.tables.gsub.features.forEach(feature => {
                 if (feature.tag === alternate) {
                     feature.feature.lookupListIndexes.forEach(lookupIndex => {
@@ -126,8 +124,8 @@ function processFont(font, settings) {
                             if (subtable.coverage.format === 1) {
                                 glyphs = subtable.coverage.glyphs;
                             } else if (subtable.coverage.format === 2) {
-                                glyphs = subtable.coverage.ranges.flatMap(range => 
-                                    Array.from({length: range.end - range.start + 1}, (_, i) => range.start + i)
+                                glyphs = subtable.coverage.ranges.flatMap(range =>
+                                    Array.from({ length: range.end - range.start + 1 }, (_, i) => range.start + i)
                                 );
                             }
 
@@ -135,7 +133,7 @@ function processFont(font, settings) {
                                 const glyphIndexSubstitute = subtable.substitute[index];
                                 const glyphOriginal = font.glyphs.glyphs[glyphIndexOriginal];
                                 const glyphSubstitute = font.glyphs.glyphs[glyphIndexSubstitute];
-                                
+
                                 const pathOriginal = glyphOriginal.path;
                                 const pathSubstitute = glyphSubstitute.path;
 
@@ -151,9 +149,7 @@ function processFont(font, settings) {
     // 2. Dimensions (Width & Height)
     const newWidthMoveAmount = settings.letterSpacing * 5;
     const newWidthDecrease = settings.letterSpacing * 10;
-    const defaultWidth = 600; 
-    // Note: Commit Mono V143 might have different defaults, but we assume 600 based on download_wizard.js
-    // Let's check font.defaultWidthX if possible, but the JS hardcodes 600.
+    const defaultWidth = 600;
     const newWidth = defaultWidth + settings.letterSpacing * 10;
 
     // Iterate over all glyphs
@@ -172,13 +168,12 @@ function processFont(font, settings) {
                 if (command.x2 !== undefined) command.x2 += newWidthMoveAmount;
             }
         });
-        
+
         glyph.leftSideBearing += newWidthMoveAmount;
         glyph.advanceWidth = newWidth;
     }
 
     font.defaultWidthX = newWidth;
-    // font.tables.cff.topDict._defaultWidthX = newWidth; // opentype.js might not expose this easily
     if (font.tables.head) {
         font.tables.head.yMax += newWidthMoveAmount;
         font.tables.head.yMin += newWidthMoveAmount;
@@ -229,11 +224,11 @@ function processFont(font, settings) {
             feature.feature.lookupListIndexes = caltLookupIndexes;
         }
     });
-    
+
     // Add calt to scripts
     font.tables.gsub.scripts.forEach(script => {
         if (script.script.defaultLangSys) {
-             script.script.defaultLangSys.featureIndexes.push(font.tables.gsub.features.length - 1);
+            script.script.defaultLangSys.featureIndexes.push(font.tables.gsub.features.length - 1);
         }
         // Also iterate langSysRecords if any
         if (script.script.langSysRecords) {
@@ -243,14 +238,7 @@ function processFont(font, settings) {
         }
     });
 
-    // 4. Update names (Simplified compared to wizard)
-    const fontName = "CommitMono"; // We keep the name simple for merging script
-    // Note: The wizard changes the name to include version. We should stick to what build.ini expects or update build.ini.
-    // build.ini expects "CommitMono-Regular.otf" etc.
-    
-    // We don't need to change internal names heavily because the merging script will set the final name to "Pending Mono".
-    // However, it's good practice to update them to reflect it's modified.
-    
+    const fontName = "CommitMono";
     font.names.fontFamily = { en: fontName };
     font.names.fontSubfamily = { en: settings.style };
     font.names.fullName = { en: `${fontName} ${settings.style}` };

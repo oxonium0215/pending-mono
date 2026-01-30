@@ -1,18 +1,21 @@
 {
-  "name": "temp_pending_mono",
-  "version": "1.0.0",
-  "description": "Pending Mono は、欧文フォント [Commit Mono](https://commitmono.com/) と日本語フォント [BIZ UDゴシック](https://github.com/googlefonts/morisawa-biz-ud-gothic) を合成したプログラミング向けフォントです。",
-  "main": "index.js",
+  "name": "staged_mono",
+  "version": "1.0.2",
+  "description": "Staged Mono - Composite font of Commit Mono and BIZ UD Gothic",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "customize": "node customize_commit_mono.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yuru7/pending-mono.git"
+    "url": "git+https://github.com/oxonium0215/pending-mono.git"
   },
-  "keywords": [],
+  "keywords": [
+    "font",
+    "programming",
+    "monospace"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "OFL-1.1",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/yuru7/pending-mono/issues"

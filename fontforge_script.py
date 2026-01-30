@@ -10,7 +10,7 @@ import uuid
 import fontforge
 import psMat
 
-# iniファイルを読み込む
+# 設定読み込み
 settings = configparser.ConfigParser()
 settings.read("build.ini", encoding="utf-8")
 
@@ -18,8 +18,8 @@ VERSION = settings.get("DEFAULT", "VERSION")
 FONT_NAME = settings.get("DEFAULT", "FONT_NAME")
 JP_FONT = settings.get("DEFAULT", "JP_FONT")
 ENG_FONT = settings.get("DEFAULT", "ENG_FONT")
-SOURCE_FONTS_DIR = settings.get("DEFAULT", "SOURCE_FONTS_DIR")
-BUILD_FONTS_DIR = settings.get("DEFAULT", "BUILD_FONTS_DIR")
+SOURCE_FONTS_DIR = os.environ.get("SOURCE_FONTS_DIR") or settings.get("DEFAULT", "SOURCE_FONTS_DIR")
+BUILD_FONTS_DIR = os.environ.get("BUILD_FONTS_DIR") or settings.get("DEFAULT", "BUILD_FONTS_DIR")
 VENDER_NAME = settings.get("DEFAULT", "VENDER_NAME")
 FONTFORGE_PREFIX = settings.get("DEFAULT", "FONTFORGE_PREFIX")
 IDEOGRAPHIC_SPACE = settings.get("DEFAULT", "IDEOGRAPHIC_SPACE")
@@ -28,11 +28,11 @@ FULL_WIDTH_35_STR = settings.get("DEFAULT", "FULL_WIDTH_35_STR")
 INVISIBLE_ZENKAKU_SPACE_STR = settings.get("DEFAULT", "INVISIBLE_ZENKAKU_SPACE_STR")
 JPDOC_STR = settings.get("DEFAULT", "JPDOC_STR")
 NERD_FONTS_STR = settings.get("DEFAULT", "NERD_FONTS_STR")
-# SLASHED_ZERO_STR = settings.get("DEFAULT", "SLASHED_ZERO_STR")
 EM_ASCENT = int(settings.get("DEFAULT", "EM_ASCENT"))
 EM_DESCENT = int(settings.get("DEFAULT", "EM_DESCENT"))
 OS2_ASCENT = int(settings.get("DEFAULT", "OS2_ASCENT"))
 OS2_DESCENT = int(settings.get("DEFAULT", "OS2_DESCENT"))
+OS2_LINEGAP = int(settings.get("DEFAULT", "OS2_LINEGAP"))
 HALF_WIDTH_12 = int(settings.get("DEFAULT", "HALF_WIDTH_12"))
 HALF_WIDTH_35 = int(settings.get("DEFAULT", "HALF_WIDTH_35"))
 FULL_WIDTH_35 = int(settings.get("DEFAULT", "FULL_WIDTH_35"))
@@ -54,13 +54,12 @@ BOLD_WEIGHT = 700
 
 
 def main():
-    # オプション判定
     get_options()
     if options.get("unknown-option"):
         usage()
         return
 
-    # buildディレクトリを作成する
+    # buildディレクトリ作成
     if os.path.exists(BUILD_FONTS_DIR) and not options.get("do-not-delete-build-dir"):
         shutil.rmtree(BUILD_FONTS_DIR)
         os.mkdir(BUILD_FONTS_DIR)
@@ -74,20 +73,18 @@ def main():
 
 
 def get_options():
-    """オプションを取得する"""
+    """オプション取得"""
 
     global options, REG_WEIGHT, BOLD_WEIGHT, OS2_ASCENT, OS2_DESCENT
 
     # オプションなしの場合は何もしない
-    if len(sys.argv) == 1:
+    args = sys.argv[1:]
+    if len(args) == 0:
         return
 
-    skip_next = False
-    for i, arg in enumerate(sys.argv[1:]):
-        if skip_next:
-            skip_next = False
-            continue
-        # オプション判定
+    i = 0
+    while i < len(args):
+        arg = args[i]
         if arg == "--do-not-delete-build-dir":
             options["do-not-delete-build-dir"] = True
         elif arg == "--invisible-zenkaku-space":
@@ -99,29 +96,34 @@ def get_options():
         elif arg == "--nerd-font":
             options["nerd-font"] = True
         elif arg == "--regular-weight":
-            val = sys.argv[i + 2]
-            if val and val.isdigit():
-                REG_WEIGHT = int(val)
-            skip_next = True
+            if i + 1 < len(args):
+                val = args[i + 1]
+                if val and val.isdigit():
+                    REG_WEIGHT = int(val)
+                i += 1
         elif arg == "--bold-weight":
-            val = sys.argv[i + 2]
-            if val and val.isdigit():
-                BOLD_WEIGHT = int(val)
-            skip_next = True
+            if i + 1 < len(args):
+                val = args[i + 1]
+                if val and val.isdigit():
+                    BOLD_WEIGHT = int(val)
+                i += 1
         elif arg == "--line-height":
-            val = sys.argv[i + 2]
-            try:
-                lh = float(val)
-                total = round(1000 * lh)
-                # 950:250 の比率を維持して計算
-                OS2_ASCENT = round(total * 950 / 1200)
-                OS2_DESCENT = total - OS2_ASCENT
-            except ValueError:
-                pass
-            skip_next = True
+            if i + 1 < len(args):
+                val = args[i + 1]
+                try:
+                    lh = float(val)
+                    total = round(1000 * lh)
+                    extra = total - (EM_ASCENT + EM_DESCENT)
+                    half = round(extra / 2)
+                    OS2_ASCENT = EM_ASCENT + half
+                    OS2_DESCENT = EM_DESCENT + (extra - half)
+                except ValueError:
+                    pass
+                i += 1
         else:
             options["unknown-option"] = True
             return
+        i += 1
 
 
 def usage():
@@ -134,65 +136,51 @@ def usage():
 def generate_font(jp_style, eng_style, merged_style, italic=False):
     print(f"=== Generate {merged_style} ===")
 
-    # 合成するフォントを開く
     jp_font, eng_font = open_fonts(jp_style, eng_style)
 
-    # 日本語文書に頻出する記号を英語フォントから削除する
+    # jpdoc: 日本語記号を使用
     if options.get("jpdoc"):
         remove_jpdoc_symbols(eng_font)
+        adjust_box_drawing_symbols(jp_font)
+    else:
+        adjust_box_drawing_symbols(eng_font)
 
-    # 重複するグリフを削除する
     delete_duplicate_glyphs(jp_font, eng_font)
-
-    # フォントのEMを1000に変換する
-    # jp_font は既に1000なので eng_font のみ変換する
     em_1000(jp_font)
-
-    # いくつかのグリフ形状に調整を加える
     adjust_some_glyph(jp_font)
 
-    # 日本語グリフの斜体を生成する
     if italic:
         transform_italic_glyphs(jp_font)
 
-    # jp_fontで半角幅(500)のグリフの幅を3:5になるよう調整する
     width_600_or_1000(jp_font)
 
-    # 3:5幅版との差分を調整する
+    # 1:2幅に変換
     if options.get("half-width"):
-        # 1:2 幅にする
         transform_half_width(jp_font, eng_font)
 
-    # GSUBテーブルを削除する (ひらがな等の全角文字が含まれる行でリガチャが解除される対策)
+    # GSUB削除 (全角文字行でリガチャ解除対策)
     remove_lookups(jp_font)
 
-    # 全角スペースを可視化する
     if not options.get("invisible-zenkaku-space"):
         visualize_zenkaku_space(jp_font)
 
-    # Nerd Fontのグリフを追加する
     if options.get("nerd-font"):
         add_nerd_font_glyphs(jp_font, eng_font)
 
-    # オプション毎の修飾子を追加する
+    # バリアント名生成
     variant = HALF_WIDTH_STR if options.get("half-width") else FULL_WIDTH_35_STR
-    variant += (
-        INVISIBLE_ZENKAKU_SPACE_STR if options.get("invisible-zenkaku-space") else ""
-    )
+    variant += INVISIBLE_ZENKAKU_SPACE_STR if options.get("invisible-zenkaku-space") else ""
     variant += JPDOC_STR if options.get("jpdoc") else ""
     variant += NERD_FONTS_STR if options.get("nerd-font") else ""
-    # variant += SLASHED_ZERO_STR if options.get("slashed-zero") else ""
 
-    # メタデータを編集する
     edit_meta_data(eng_font, merged_style, variant)
     edit_meta_data(jp_font, merged_style, variant)
 
-    # ttfファイルに保存
+    # 保存
     generate_filename_part = f"{BUILD_FONTS_DIR}/{FONTFORGE_PREFIX}{FONT_NAME.replace(' ', '')}{variant}-{merged_style}"
     eng_font.generate(f"{generate_filename_part}-eng.ttf")
     jp_font.generate(f"{generate_filename_part}-jp.ttf")
 
-    # ttfを閉じる
     jp_font.close()
     eng_font.close()
 
@@ -206,28 +194,21 @@ def open_fonts(jp_style: str, eng_style: str):
         f"{SOURCE_FONTS_DIR}/{ENG_FONT.replace('{style}', eng_style)}"
     )
 
-    # fonttools merge エラー対処
     jp_font = altuni_to_entity(jp_font)
-
-    # フォント参照を解除する
     jp_font.unlinkReferences()
     eng_font.unlinkReferences()
     return jp_font, eng_font
 
 
 def altuni_to_entity(jp_font):
-    """Alternate Unicodeで透過的に参照して表示している箇所を実体のあるグリフに変換する"""
+    """透過参照を実体グリフに変換"""
     for glyph in jp_font.glyphs():
         if glyph.altuni is not None:
-            # 以下形式のタプルで返ってくる
             # (unicode-value, variation-selector, reserved-field)
-            # 第3フィールドは常に0なので無視
             altunis = glyph.altuni
 
-            # variation-selectorがなく (-1)、透過的にグリフを参照しているものは実体のグリフに変換する
             before_altuni = ""
             for altuni in altunis:
-                # 直前のaltuniと同じ場合はスキップ
                 if altuni[1] == -1 and before_altuni != ",".join(map(str, altuni)):
                     glyph.altuni = None
                     copy_target_unicode = altuni[0]
@@ -236,29 +217,26 @@ def altuni_to_entity(jp_font):
                             copy_target_unicode,
                             f"uni{hex(copy_target_unicode).replace('0x', '').upper()}copy",
                         )
-                    except Exception:
+                    except (TypeError, ValueError, KeyError):
                         copy_target_glyph = jp_font[copy_target_unicode]
                     copy_target_glyph.clear()
                     copy_target_glyph.width = glyph.width
-                    # copy_target_glyph.addReference(glyph.glyphname)
                     jp_font.selection.select(glyph.glyphname)
                     jp_font.copy()
                     jp_font.selection.select(copy_target_glyph.glyphname)
                     jp_font.paste()
                 before_altuni = ",".join(map(str, altuni))
-    # エンコーディングの整理のため、開き直す
+    # エンコーディング整理のため開き直す
     font_path = f"{BUILD_FONTS_DIR}/{jp_font.fullname}_{uuid.uuid4()}.ttf"
     jp_font.generate(font_path)
     jp_font.close()
     reopen_jp_font = fontforge.open(font_path)
-    # 一時ファイルを削除
     os.remove(font_path)
     return reopen_jp_font
 
 
 def adjust_some_glyph(jp_font):
-    """いくつかのグリフ形状に調整を加える"""
-    # 全角括弧の開きを広くする
+    """グリフ形状調整"""
     full_width = jp_font[0x3042].width
     adjust_length = round(full_width / 6)
     for glyph_name in [0xFF08, 0xFF3B, 0xFF5B]:
@@ -272,7 +250,7 @@ def adjust_some_glyph(jp_font):
 
 
 def em_1000(font):
-    """フォントのEMを1000に変換する"""
+    """フォントのEMを1000に変換"""
     font.em = EM_ASCENT + EM_DESCENT
 
 
@@ -287,10 +265,8 @@ def delete_duplicate_glyphs(jp_font, eng_font):
             if glyph.isWorthOutputting() and glyph.unicode > 0:
                 eng_font.selection.select(("more", "unicode"), glyph.unicode)
         except ValueError:
-            # Encoding is out of range のときは継続する
             continue
     for glyph in eng_font.selection.byGlyphs:
-        # if glyph.isWorthOutputting():
         jp_font.selection.select(("more", "unicode"), glyph.unicode)
     for glyph in jp_font.selection.byGlyphs:
         glyph.clear()
@@ -300,129 +276,126 @@ def delete_duplicate_glyphs(jp_font, eng_font):
 
 
 def remove_lookups(font):
-    """GSUB, GPOSテーブルを削除する"""
+    """ルックアップ削除"""
     for lookup in list(font.gsub_lookups) + list(font.gpos_lookups):
         font.removeLookup(lookup)
 
 
 def transform_italic_glyphs(font):
-    # 斜体の傾き
+    """斜体変換"""
     ITALIC_SLOPE = 9
-    # 傾きを設定する
     font.italicangle = -ITALIC_SLOPE
-    # 全グリフを斜体に変換
     for glyph in font.glyphs():
         glyph.transform(psMat.skew(ITALIC_SLOPE * math.pi / 180))
 
 
 def remove_jpdoc_symbols(eng_font):
-    """日本語文書に頻出する記号を削除する"""
-    eng_font.selection.none()
-    # § (U+00A7)
-    eng_font.selection.select(("more", "unicode"), 0x00A7)
-    # ± (U+00B1)
-    eng_font.selection.select(("more", "unicode"), 0x00B1)
-    # ¶ (U+00B6)
-    eng_font.selection.select(("more", "unicode"), 0x00B6)
-    # ÷ (U+00F7)
-    eng_font.selection.select(("more", "unicode"), 0x00F7)
-    # × (U+00D7)
-    eng_font.selection.select(("more", "unicode"), 0x00D7)
-    # ⇒ (U+21D2)
-    eng_font.selection.select(("more", "unicode"), 0x21D2)
-    # ⇔ (U+21D4)
-    eng_font.selection.select(("more", "unicode"), 0x21D4)
-    # ■-□ (U+25A0-U+25A1)
-    eng_font.selection.select(("more", "ranges"), 0x25A0, 0x25A1)
-    # ▲-△ (U+25B2-U+25B3)
-    eng_font.selection.select(("more", "ranges"), 0x25B2, 0x25B3)
-    # ▼-▽ (U+25BC-U+25BD)
-    eng_font.selection.select(("more", "ranges"), 0x25BC, 0x25BD)
-    # ◆-◇ (U+25C6-U+25C7)
-    eng_font.selection.select(("more", "ranges"), 0x25C6, 0x25C7)
-    # ○ (U+25CB)
-    eng_font.selection.select(("more", "unicode"), 0x25CB)
-    # ◎-● (U+25CE-U+25CF)
-    eng_font.selection.select(("more", "ranges"), 0x25CE, 0x25CF)
-    # ◥ (U+25E5)
-    eng_font.selection.select(("more", "unicode"), 0x25E5)
-    # ◯ (U+25EF)
-    eng_font.selection.select(("more", "unicode"), 0x25EF)
-    # √ (U+221A)
-    eng_font.selection.select(("more", "unicode"), 0x221A)
-    # ∞ (U+221E)
-    eng_font.selection.select(("more", "unicode"), 0x221E)
-    # ‐ (U+2010)
-    eng_font.selection.select(("more", "unicode"), 0x2010)
-    # ‘-‚ (U+2018-U+201A)
-    eng_font.selection.select(("more", "ranges"), 0x2018, 0x201A)
-    # “-„ (U+201C-U+201E)
-    eng_font.selection.select(("more", "ranges"), 0x201C, 0x201E)
-    # †-‡ (U+2020-U+2021)
-    eng_font.selection.select(("more", "ranges"), 0x2020, 0x2021)
-    # … (U+2026)
-    eng_font.selection.select(("more", "unicode"), 0x2026)
-    # ‰ (U+2030)
-    eng_font.selection.select(("more", "unicode"), 0x2030)
-    # ←-↓ (U+2190-U+2193)
-    eng_font.selection.select(("more", "ranges"), 0x2190, 0x2193)
-    # ∀ (U+2200)
-    eng_font.selection.select(("more", "unicode"), 0x2200)
-    # ∂-∃ (U+2202-U+2203)
-    eng_font.selection.select(("more", "ranges"), 0x2202, 0x2203)
-    # ∈ (U+2208)
-    eng_font.selection.select(("more", "unicode"), 0x2208)
-    # ∋ (U+220B)
-    eng_font.selection.select(("more", "unicode"), 0x220B)
-    # ∑ (U+2211)
-    eng_font.selection.select(("more", "unicode"), 0x2211)
-    # ∥ (U+2225)
-    eng_font.selection.select(("more", "unicode"), 0x2225)
-    # ∧-∬ (U+2227-U+222C)
-    eng_font.selection.select(("more", "ranges"), 0x2227, 0x222C)
-    # ≠-≡ (U+2260-U+2261)
-    eng_font.selection.select(("more", "ranges"), 0x2260, 0x2261)
-    # ⊂-⊃ (U+2282-U+2283)
-    eng_font.selection.select(("more", "ranges"), 0x2282, 0x2283)
-    # ⊆-⊇ (U+2286-U+2287)
-    eng_font.selection.select(("more", "ranges"), 0x2286, 0x2287)
-    # ─-╿ (Box Drawing) (U+2500-U+257F)
-    eng_font.selection.select(("more", "ranges"), 0x2500, 0x257F)
-    for glyph in eng_font.selection.byGlyphs:
-        if glyph.isWorthOutputting():
+    """日本語記号を削除"""
+    limit_top = 980
+    limit_bottom = -220
+
+    ranges = [
+        (0x00A7, 0x00A7), (0x00B1, 0x00B1), (0x00B6, 0x00B6), (0x00F7, 0x00F7), (0x00D7, 0x00D7),
+        (0x21D2, 0x21D2), (0x21D4, 0x21D4), (0x25A0, 0x25A1), (0x25B2, 0x25B3), (0x25BC, 0x25BD),
+        (0x25C6, 0x25C7), (0x25CB, 0x25CB), (0x25CE, 0x25CF), (0x25E5, 0x25E5), (0x25EF, 0x25EF),
+        (0x221A, 0x221A), (0x221E, 0x221E), (0x2010, 0x2010), (0x2018, 0x201A), (0x201C, 0x201E),
+        (0x2020, 0x2021), (0x2026, 0x2026), (0x2030, 0x2030), (0x2190, 0x2193), (0x2200, 0x2200),
+        (0x2202, 0x2203), (0x2208, 0x2208), (0x220B, 0x220B), (0x2211, 0x2211), (0x2225, 0x2225),
+        (0x2227, 0x222C), (0x2260, 0x2261), (0x2282, 0x2283), (0x2286, 0x2287), (0x2500, 0x259F)
+    ]
+    
+    count = 0
+    for glyph in eng_font.glyphs():
+        u = glyph.unicode
+        name = glyph.glyphname
+        bbox = glyph.boundingBox()
+        
+        should_remove = False
+        if bbox[3] > limit_top or bbox[1] < limit_bottom:
+            should_remove = True
+        
+        if not should_remove and u != -1:
+            for start, end in ranges:
+                if start <= u <= end:
+                    should_remove = True
+                    break
+        
+        if not should_remove and name.startswith("uni25") and len(name) == 7:
+            should_remove = True
+            
+        if should_remove:
             glyph.clear()
-    eng_font.selection.none()
+            glyph.unicode = -1
+            glyph.glyphname = f"deleted_symbol_{count}"
+            count += 1
+
+
+def adjust_box_drawing_symbols(font):
+    """罫線を行間に延伸"""
+    font.selection.none()
+    font.selection.select(("ranges",), 0x2500, 0x259F)
+
+    THRESHOLD_TOP = 600
+    THRESHOLD_BOTTOM = 200
+    MOVE_UP = OS2_ASCENT - EM_ASCENT
+    MOVE_DOWN = OS2_DESCENT - EM_DESCENT
+    THRESHOLD_X_LEFT = 200
+    THRESHOLD_X_RIGHT_MARGIN = 200
+
+    for glyph in font.selection.byGlyphs:
+        width = glyph.width
+        layer_name = "Foreground"
+        if layer_name not in glyph.layers:
+            layer_name = glyph.activeLayer
+
+        foreground = glyph.layers[layer_name]
+        modified = False
+
+        for contour in foreground:
+            for point in contour:
+                
+                if point.y > THRESHOLD_TOP:
+                    point.y += MOVE_UP
+                    modified = True
+                elif point.y < THRESHOLD_BOTTOM:
+                    point.y -= MOVE_DOWN
+                    modified = True
+
+                if point.x < THRESHOLD_X_LEFT:
+                    point.x = 0
+                    modified = True
+                elif point.x > width - THRESHOLD_X_RIGHT_MARGIN:
+                    point.x = width
+                    modified = True
+        
+        if modified:
+            glyph.layers[layer_name] = foreground
+
+    font.selection.none()
 
 
 def width_600_or_1000(jp_font):
-    """半角幅か全角幅になるように変換する。"""
+    """幅を600または1000に統一"""
     half_width = HALF_WIDTH_35
     full_width = FULL_WIDTH_35
     for glyph in jp_font.glyphs():
         if 0 < glyph.width <= half_width + 20:
-            # グリフ位置を調整してから幅を設定
             glyph.transform(psMat.translate((half_width - glyph.width) / 2, 0))
             glyph.width = half_width
         elif half_width < glyph.width < full_width:
-            # グリフ位置を調整してから幅を設定
             glyph.transform(psMat.translate((full_width - glyph.width) / 2, 0))
             glyph.width = full_width
-        # 600の場合はそのまま
 
 
 def transform_half_width(jp_font, eng_font):
-    """1:2幅になるように変換する。既に3:5幅になっていることを前提とする。"""
+    """幅を1:2比に変換"""
     before_width_eng = eng_font[0x0030].width
     after_width_eng = HALF_WIDTH_12
-    # グリフそのものは 540 幅相当で縮小し、最終的に HALF_WIDTH_12 の幅を設定する
     x_scale = 540 / before_width_eng
     for glyph in eng_font.glyphs():
         if glyph.width > 0:
-            # リガチャ考慮
             after_width_eng_multiply = after_width_eng * round(glyph.width / HALF_WIDTH_35)
-            # 縮小
             glyph.transform(psMat.scale(x_scale, 1))
-            # 幅を設定
             glyph.transform(
                 psMat.translate((after_width_eng_multiply - glyph.width) / 2, 0)
             )
@@ -430,23 +403,19 @@ def transform_half_width(jp_font, eng_font):
 
     for glyph in jp_font.glyphs():
         if glyph.width == HALF_WIDTH_35:
-            # 英数字グリフと同じ幅にする
             glyph.transform(psMat.translate((after_width_eng - glyph.width) / 2, 0))
             glyph.width = after_width_eng
         elif glyph.width == FULL_WIDTH_35:
-            # 全角は after_width_eng の倍の幅にする
             glyph.transform(psMat.translate((after_width_eng * 2 - glyph.width) / 2, 0))
             glyph.width = after_width_eng * 2
 
 
 def visualize_zenkaku_space(jp_font):
-    """全角スペースを可視化する"""
-    # 全角スペースを差し替え
+    """全角スペース可視化"""
     glyph = jp_font[0x3000]
     width_to = glyph.width
     glyph.clear()
     jp_font.mergeFonts(fontforge.open(f"{SOURCE_FONTS_DIR}/{IDEOGRAPHIC_SPACE}"))
-    # 幅を設定し位置調整
     jp_font.selection.select("U+3000")
     for glyph in jp_font.selection.byGlyphs:
         width_from = glyph.width
@@ -456,9 +425,8 @@ def visualize_zenkaku_space(jp_font):
 
 
 def add_nerd_font_glyphs(jp_font, eng_font):
-    """Nerd Fontのグリフを追加する"""
+    """ネードフォントグリフ追加"""
     global nerd_font
-    # Nerd Fontのグリフを追加する
     if nerd_font is None:
         nerd_font = fontforge.open(
             f"{SOURCE_FONTS_DIR}/nerd-fonts/SymbolsNerdFont-Regular.ttf"
@@ -466,15 +434,13 @@ def add_nerd_font_glyphs(jp_font, eng_font):
         nerd_font.em = EM_ASCENT + EM_DESCENT
         glyph_names = set()
         for nerd_glyph in nerd_font.glyphs():
-            # postテーブルでのグリフ名重複対策
-            # fonttools merge で合成した後、MacOSで `'post'テーブルの使用性` エラーが発生することへの対処
+            # グリフ名重複対策
             if nerd_glyph.glyphname in glyph_names:
                 nerd_glyph.glyphname = f"{nerd_glyph.glyphname}-{nerd_glyph.encoding}"
             glyph_names.add(nerd_glyph.glyphname)
             half_width = eng_font[0x0030].width
-            # Powerline Symbols の調整
             if 0xE0B0 <= nerd_glyph.unicode <= 0xE0D4:
-                # なぜかズレている右付きグリフの個別調整 (EM 1000 に変更した後を想定して調整)
+                # 右付きグリフの位置調整
                 original_width = nerd_glyph.width
                 if nerd_glyph.unicode == 0xE0B2:
                     nerd_glyph.transform(psMat.translate(-353, 0))
@@ -487,49 +453,40 @@ def add_nerd_font_glyphs(jp_font, eng_font):
                 elif nerd_glyph.unicode == 0xE0D4:
                     nerd_glyph.transform(psMat.translate(-314, 0))
                 nerd_glyph.width = original_width
-                # 位置と幅合わせ
                 if nerd_glyph.width < half_width:
-                    # 幅が狭いグリフは中央寄せとみなして調整する
                     nerd_glyph.transform(
                         psMat.translate((half_width - nerd_glyph.width) / 2, 0)
                     )
                 elif nerd_glyph.width > half_width:
-                    # 幅が広いグリフは縮小して調整する
                     nerd_glyph.transform(psMat.scale(half_width / nerd_glyph.width, 1))
-                # グリフの高さ・位置を調整する
                 nerd_glyph.transform(psMat.scale(1, 1.21))
                 nerd_glyph.transform(psMat.translate(0, -24))
             elif nerd_glyph.width < HALF_WIDTH_35:
-                # 幅が狭いグリフは中央寄せとみなして調整する
                 nerd_glyph.transform(
                     psMat.translate((half_width - nerd_glyph.width) / 2, 0)
                 )
-            # 幅を設定
             nerd_glyph.width = half_width
-    # 日本語フォントにマージするため、既に存在する場合は削除する
+    # 既存グリフ削除後マージ
     for nerd_glyph in nerd_font.glyphs():
         if nerd_glyph.unicode != -1:
-            # 既に存在する場合は削除する
             try:
                 jp_font[nerd_glyph.unicode].clear()
-            except Exception:
+            except (TypeError, KeyError):
                 pass
             try:
                 eng_font[nerd_glyph.unicode].clear()
-            except Exception:
+            except (TypeError, KeyError):
                 pass
     jp_font.mergeFonts(nerd_font)
 
 
 def edit_meta_data(font, weight: str, variant: str):
-    """フォント内のメタデータを編集する"""
+    """メタデータ編集"""
     font.ascent = EM_ASCENT
     font.descent = EM_DESCENT
 
-    # Version settings
     font.version = VERSION
     try:
-        # 1.0.1 -> 1.01
         v_parts = VERSION.split('.')
         if len(v_parts) >= 2:
             font.fontRevision = float(f"{v_parts[0]}.{''.join(v_parts[1:])}")
@@ -538,9 +495,9 @@ def edit_meta_data(font, weight: str, variant: str):
     except Exception:
         pass
 
-    font.os2_typoascent = OS2_ASCENT
-    font.os2_typodescent = -OS2_DESCENT
-    font.os2_typolinegap = 0
+    font.os2_typoascent = EM_ASCENT
+    font.os2_typodescent = -EM_DESCENT
+    font.os2_typolinegap = OS2_LINEGAP
     font.os2_winascent = OS2_ASCENT
     font.os2_windescent = OS2_DESCENT
 

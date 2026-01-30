@@ -19,3 +19,18 @@ release_notes.md
 
 # Test and temporary scripts
 test_display.html
+weight_test.html
+test_build_manual.sh
+build_console_variant.sh
+
+# Debug/utility scripts
+check_*.py
+find_outliers.py
+compare_fonts.py
+
+# Local directories
+bin/
+venv/
+.venv/
+__pycache__/
+build_logs/
