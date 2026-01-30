@@ -50,12 +50,12 @@ def edit_fonts(specific_variant: str, line_height: float = None):
 
     global OS2_ASCENT, OS2_DESCENT, OS2_LINEGAP
     if line_height is not None:
-        # ベースを 1000 に固定
-        OS2_ASCENT = 880
-        OS2_DESCENT = 120
-        # 超過分を LineGap に逃がす (Notepad 等での行間肥大化対策)
+        # HackGen互換: 行高さを Typo/Win 両方で調整
+        # line_height=1.12 → Typo=1.08 EM, Win=1.12 EM (HackGenと同等)
         total = round(1000 * line_height)
-        OS2_LINEGAP = max(0, total - 1000)
+        OS2_LINEGAP = max(0, total - 1000 - 40)  # Typo用: 約4%少なく
+        OS2_ASCENT = 880 + (total - 1000) // 2   # Win用: 上下に分配
+        OS2_DESCENT = 120 + (total - 1000) - (total - 1000) // 2
 
     if specific_variant is None:
         specific_variant = ""
@@ -233,17 +233,10 @@ def fix_os2_table(xml: ET, style: str, flag_hw: bool = False):
     xml.find("OS_2/sTypoDescender").set("value", str(-EM_DESCENT))
     xml.find("OS_2/sTypoLineGap").set("value", str(OS2_LINEGAP))
 
-    # Windows での行間肥大化対策: usWin 合計を 1200 (1.2倍) に固定
-    # グリフ縮小なしの場合、はみ出し部分はクリップされる可能性があるが行間の一貫性を優先
-    # LineGap を上下に均等に振り分けて WinAscent/Descent を算出する (ハードコード排除)
-    half_linegap = OS2_LINEGAP // 2
-    remainder = OS2_LINEGAP % 2
-    
-    win_ascent = OS2_ASCENT + half_linegap + remainder
-    win_descent = OS2_DESCENT + half_linegap
-
-    xml.find("OS_2/usWinAscent").set("value", str(win_ascent))
-    xml.find("OS_2/usWinDescent").set("value", str(win_descent))
+    # HackGen互換: WinメトリクスはLineGapとは独立して設定
+    # Typo方式(1.08 EM)とWin方式(1.12 EM)の差を4%に縮小し、アプリ間の一貫性を確保
+    xml.find("OS_2/usWinAscent").set("value", str(OS2_ASCENT))
+    xml.find("OS_2/usWinDescent").set("value", str(OS2_DESCENT))
 
     # fsSelection (Bit 7 USE_TYPO_METRICS は無効化: HackGen互換)
     fs_selection = None

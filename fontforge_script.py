@@ -75,7 +75,7 @@ def main():
 def get_options():
     """オプション取得"""
 
-    global options, REG_WEIGHT, BOLD_WEIGHT, OS2_ASCENT, OS2_DESCENT
+    global options, REG_WEIGHT, BOLD_WEIGHT, OS2_ASCENT, OS2_DESCENT, OS2_LINEGAP
 
     # オプションなしの場合は何もしない
     args = sys.argv[1:]
@@ -112,11 +112,11 @@ def get_options():
                 val = args[i + 1]
                 try:
                     lh = float(val)
+                    # HackGen互換: Typo/Win両方で調整
                     total = round(1000 * lh)
-                    extra = total - (EM_ASCENT + EM_DESCENT)
-                    half = round(extra / 2)
-                    OS2_ASCENT = EM_ASCENT + half
-                    OS2_DESCENT = EM_DESCENT + (extra - half)
+                    OS2_LINEGAP = max(0, total - 1000 - 40)  # Typo用: 約4%少なく
+                    OS2_ASCENT = 880 + (total - 1000) // 2   # Win用: 上下に分配
+                    OS2_DESCENT = 120 + (total - 1000) - (total - 1000) // 2
                 except ValueError:
                     pass
                 i += 1
@@ -291,8 +291,8 @@ def transform_italic_glyphs(font):
 
 def remove_jpdoc_symbols(eng_font):
     """日本語記号を削除"""
-    limit_top = 980
-    limit_bottom = -220
+    limit_top = OS2_ASCENT
+    limit_bottom = -OS2_DESCENT
 
     ranges = [
         (0x00A7, 0x00A7), (0x00B1, 0x00B1), (0x00B6, 0x00B6), (0x00F7, 0x00F7), (0x00D7, 0x00D7),
@@ -335,10 +335,12 @@ def adjust_box_drawing_symbols(font):
     font.selection.none()
     font.selection.select(("ranges",), 0x2500, 0x259F)
 
-    THRESHOLD_TOP = 600
-    THRESHOLD_BOTTOM = 200
-    MOVE_UP = OS2_ASCENT - EM_ASCENT
-    MOVE_DOWN = OS2_DESCENT - EM_DESCENT
+    # 延長の目標座標 (Win/hhea高さに一致)
+    TARGET_TOP = OS2_ASCENT
+    TARGET_BOTTOM = -OS2_DESCENT
+    # 延長対象判定の閾値 (EM境界より少し内側)
+    THRESHOLD_TOP = EM_ASCENT - 100  # 780
+    THRESHOLD_BOTTOM = -EM_DESCENT + 100  # -20
     THRESHOLD_X_LEFT = 200
     THRESHOLD_X_RIGHT_MARGIN = 200
 
@@ -353,12 +355,13 @@ def adjust_box_drawing_symbols(font):
 
         for contour in foreground:
             for point in contour:
-                
+                # 上端: 閾値を超えたら目標座標に設定
                 if point.y > THRESHOLD_TOP:
-                    point.y += MOVE_UP
+                    point.y = TARGET_TOP
                     modified = True
+                # 下端: 閾値を下回ったら目標座標に設定
                 elif point.y < THRESHOLD_BOTTOM:
-                    point.y -= MOVE_DOWN
+                    point.y = TARGET_BOTTOM
                     modified = True
 
                 if point.x < THRESHOLD_X_LEFT:
@@ -459,8 +462,12 @@ def add_nerd_font_glyphs(jp_font, eng_font):
                     )
                 elif nerd_glyph.width > half_width:
                     nerd_glyph.transform(psMat.scale(half_width / nerd_glyph.width, 1))
-                nerd_glyph.transform(psMat.scale(1, 1.21))
-                nerd_glyph.transform(psMat.translate(0, -24))
+                # 行高さに合わせてスケーリング (Win/hhea高さ / EM)
+                line_height_scale = (OS2_ASCENT + OS2_DESCENT) / (EM_ASCENT + EM_DESCENT)
+                nerd_glyph.transform(psMat.scale(1, line_height_scale))
+                # 上下中央揃え調整
+                vertical_shift = (OS2_DESCENT - EM_DESCENT) - (OS2_ASCENT - EM_ASCENT)
+                nerd_glyph.transform(psMat.translate(0, vertical_shift / 2))
             elif nerd_glyph.width < HALF_WIDTH_35:
                 nerd_glyph.transform(
                     psMat.translate((half_width - nerd_glyph.width) / 2, 0)

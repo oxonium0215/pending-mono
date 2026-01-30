@@ -28,7 +28,6 @@ async function main() {
     let outputDir = './source_fonts/commit-mono';
     let featuresList = '';
     let letterSpacing = 0;
-    let lineHeight = 1.0;
     let regWeight = "400";
     let boldWeight = "700";
 
@@ -37,7 +36,6 @@ async function main() {
         else if (args[i] === '--output-dir') outputDir = args[++i];
         else if (args[i] === '--features') featuresList = args[++i];
         else if (args[i] === '--letter-spacing') letterSpacing = parseFloat(args[++i]);
-        else if (args[i] === '--line-height') lineHeight = parseFloat(args[++i]);
         else if (args[i] === '--regular-weight') regWeight = args[++i] || "400";
         else if (args[i] === '--bold-weight') boldWeight = args[++i] || "700";
     }
@@ -96,7 +94,6 @@ async function main() {
             alternates: activeAlternates,
             features: activeFeatures,
             letterSpacing,
-            lineHeight,
             weight: style.weight,
             style: style.styleName,
             italic: style.italic
@@ -188,20 +185,6 @@ function processFont(font, settings) {
         font.tables.os2.xAvgCharWidth = newWidth;
     }
 
-    // Change Height
-    const newHeightOffset = settings.lineHeight * 500 - 500;
-    font.ascender += newHeightOffset;
-    font.descender -= newHeightOffset;
-    if (font.tables.hhea) {
-        font.tables.hhea.ascender += newHeightOffset;
-        font.tables.hhea.descender -= newHeightOffset;
-    }
-    if (font.tables.os2) {
-        font.tables.os2.sTypoAscender += newHeightOffset;
-        font.tables.os2.sTypoDescender -= newHeightOffset;
-        font.tables.os2.usWinAscent += newHeightOffset;
-        font.tables.os2.usWinDescent += newHeightOffset;
-    }
 
     // 3. Features (calt injection)
     // Create empty calt feature
